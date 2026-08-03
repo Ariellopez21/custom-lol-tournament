@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ruleta de Espejo · Mirror Match</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;800;900&family=Barlow+Semi+Condensed:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ─────────────────────────────────────────────
+   TOKENS
+   ───────────────────────────────────────────── */
+:root{
+  --abismo:#070B12;
+  --noche:#0C1526;
+  --piedra:#16233A;
+  --oro:#C8AA6E;
+  --oro-claro:#F0E6D2;
+  --arcano:#0AC8B9;
+  --sangre:#C0455C;
+  --humo:#7A8AA0;
+
+  --display:"Cinzel", "Trajan Pro", Georgia, serif;
+  --ui:"Barlow Semi Condensed", "Roboto Condensed", system-ui, sans-serif;
+
+  --item-h:88px;
+  --reel-h:264px;
+  --giro:5200ms;
+}
+
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  min-height:100vh;
+  background:
+    radial-gradient(1100px 700px at 50% -10%, #16304A 0%, transparent 62%),
+    radial-gradient(800px 500px at 50% 108%, #12253C 0%, transparent 60%),
+    var(--abismo);
+  color:var(--oro-claro);
+  font-family:var(--ui);
+  font-weight:300;
+  padding:clamp(20px,4vw,56px) clamp(16px,4vw,40px) 72px;
+  overflow-x:hidden;
+}
+body::before{
+  content:"";
+  position:fixed; inset:0; pointer-events:none; z-index:0;
+  background-image:
+    linear-gradient(to right, rgba(200,170,110,.045) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(200,170,110,.045) 1px, transparent 1px);
+  background-size:64px 64px;
+  mask-image:radial-gradient(circle at 50% 40%, #000 0%, transparent 72%);
+  -webkit-mask-image:radial-gradient(circle at 50% 40%, #000 0%, transparent 72%);
+}
+.lienzo{position:relative; z-index:1; max-width:1120px; margin:0 auto}
+
+/* ─────────────────────────────────────────────
+   CABECERA
+   ───────────────────────────────────────────── */
+.encabezado{text-align:center; margin-bottom:clamp(28px,5vw,52px)}
+.marca{
+  font-family:var(--ui);
+  font-size:12px; font-weight:500;
+  letter-spacing:.62em; text-transform:uppercase;
+  color:var(--arcano);
+  margin:0 0 18px;
+  padding-left:.62em;
+}
+.titulo{
+  font-family:var(--display); font-weight:900;
+  font-size:clamp(34px,7.2vw,68px);
+  line-height:.96; margin:0;
+  letter-spacing:.02em;
+  background:linear-gradient(180deg,#FFF7E4 8%, var(--oro) 58%, #8A6E3C 100%);
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+}
+.bajada{
+  margin:16px auto 0; max-width:52ch;
+  font-size:clamp(14px,1.6vw,17px); color:var(--humo);
+}
+.bajada b{color:var(--oro); font-weight:500}
+
+/* ─────────────────────────────────────────────
+   PANEL DE INVOCADORES
+   ───────────────────────────────────────────── */
+.duelo{
+  display:grid;
+  grid-template-columns:1fr auto 1fr;
+  gap:clamp(12px,2.4vw,28px);
+  align-items:end;
+  margin-bottom:26px;
+}
+.campo{display:flex; flex-direction:column; gap:9px; min-width:0}
+.campo label{
+  font-size:11px; letter-spacing:.34em; text-transform:uppercase;
+  color:var(--humo); font-weight:500;
+}
+.campo--b{text-align:right}
+.campo--b label{align-self:flex-end}
+.campo input{
+  width:100%;
+  background:linear-gradient(180deg, rgba(22,35,58,.9), rgba(12,21,38,.9));
+  border:1px solid rgba(200,170,110,.28);
+  border-radius:2px;
+  color:var(--oro-claro);
+  font-family:var(--display); font-weight:600;
+  font-size:clamp(16px,2.2vw,21px);
+  padding:14px 16px;
+  transition:border-color .2s, box-shadow .2s;
+}
+.campo--b input{text-align:right}
+.campo input::placeholder{color:rgba(122,138,160,.55); font-weight:400}
+.campo input:hover{border-color:rgba(200,170,110,.5)}
+.campo input:focus{
+  outline:none;
+  border-color:var(--arcano);
+  box-shadow:0 0 0 1px var(--arcano), 0 0 26px -8px var(--arcano);
+}
+.versus{
+  font-family:var(--display); font-weight:900;
+  font-size:clamp(20px,3vw,30px);
+  color:var(--sangre);
+  padding-bottom:12px;
+  text-shadow:0 0 24px rgba(192,69,92,.5);
+}
+
+/* ─────────────────────────────────────────────
+   BOTÓN
+   ───────────────────────────────────────────── */
+.acciones{display:flex; justify-content:center; margin-bottom:clamp(30px,5vw,48px)}
+.boton{
+  position:relative;
+  font-family:var(--display); font-weight:800;
+  font-size:clamp(15px,1.9vw,19px);
+  letter-spacing:.18em; text-transform:uppercase;
+  color:#0A0F18;
+  background:linear-gradient(180deg,#F3E7CB 0%, var(--oro) 52%, #9C7B41 100%);
+  border:1px solid #E4D3A8;
+  border-radius:2px;
+  padding:16px 44px;
+  cursor:pointer;
+  transition:transform .15s, box-shadow .25s, filter .2s;
+  box-shadow:0 0 0 1px rgba(0,0,0,.6), 0 14px 40px -18px var(--oro);
+}
+.boton:hover:not(:disabled){transform:translateY(-2px); box-shadow:0 0 0 1px rgba(0,0,0,.6), 0 20px 46px -16px var(--oro)}
+.boton:active:not(:disabled){transform:translateY(0)}
+.boton:focus-visible{outline:2px solid var(--arcano); outline-offset:4px}
+.boton:disabled{
+  cursor:progress;
+  filter:grayscale(.55) brightness(.72);
+  animation:latido 1.1s ease-in-out infinite;
+}
+@keyframes latido{50%{filter:grayscale(.55) brightness(.95)}}
+
+/* ─────────────────────────────────────────────
+   RULETA
+   ───────────────────────────────────────────── */
+.ruleta{position:relative; display:grid; place-items:center; margin-bottom:clamp(34px,6vw,60px)}
+.aro{
+  position:absolute; z-index:0;
+  width:min(560px,96vw); aspect-ratio:1;
+  border:1px solid rgba(200,170,110,.16);
+  border-radius:50%;
+  transform:rotate(0deg);
+}
+.aro::before,.aro::after{
+  content:""; position:absolute; inset:34px;
+  border:1px dashed rgba(10,200,185,.16);
+  border-radius:50%;
+}
+.aro::after{inset:76px; border-style:solid; border-color:rgba(200,170,110,.1)}
+.ruleta.girando .aro{animation:orbita 3.4s linear infinite}
+@keyframes orbita{to{transform:rotate(360deg)}}
+
+.tambor{
+  position:relative; z-index:1;
+  width:min(660px,100%);
+  height:var(--reel-h);
+  overflow:hidden;
+  background:linear-gradient(180deg, rgba(7,11,18,.94), rgba(18,37,60,.86) 50%, rgba(7,11,18,.94));
+  border-top:1px solid rgba(200,170,110,.4);
+  border-bottom:1px solid rgba(200,170,110,.4);
+  box-shadow:inset 0 0 90px -20px #000;
+  mask-image:linear-gradient(180deg, transparent 0%, #000 22%, #000 78%, transparent 100%);
+  -webkit-mask-image:linear-gradient(180deg, transparent 0%, #000 22%, #000 78%, transparent 100%);
+}
+.cinta{
+  position:absolute; left:0; right:0;
+  top:calc(50% - var(--item-h)/2);
+  will-change:transform;
+}
+.cinta.rodando{filter:blur(3px)}
+.ranura{
+  height:var(--item-h);
+  display:grid; place-items:center;
+  font-family:var(--display); font-weight:600;
+  font-size:clamp(20px,3.4vw,32px);
+  color:rgba(240,230,210,.42);
+  letter-spacing:.03em;
+  white-space:nowrap;
+}
+.marcador{
+  position:absolute; z-index:2; left:0; right:0; top:50%;
+  height:var(--item-h); transform:translateY(-50%);
+  pointer-events:none;
+  border-top:1px solid rgba(10,200,185,.55);
+  border-bottom:1px solid rgba(10,200,185,.55);
+  background:linear-gradient(90deg, rgba(10,200,185,.1), transparent 30%, transparent 70%, rgba(10,200,185,.1));
+}
+.marcador span{
+  position:absolute; top:50%; width:0; height:0;
+  border:9px solid transparent;
+}
+.marcador .izq{left:0; transform:translateY(-50%); border-left-color:var(--oro)}
+.marcador .der{right:0; transform:translateY(-50%); border-right-color:var(--oro)}
+
+/* ─────────────────────────────────────────────
+   REVELACIÓN
+   ───────────────────────────────────────────── */
+.revelacion{
+  position:relative;
+  border:1px solid rgba(200,170,110,.3);
+  border-radius:3px;
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(10,200,185,.10), transparent 60%),
+    linear-gradient(180deg, rgba(18,37,60,.72), rgba(7,11,18,.92));
+  padding:clamp(26px,4.4vw,52px) clamp(18px,3.4vw,44px);
+  overflow:hidden;
+}
+.revelacion[hidden]{display:none}
+.revelacion.entrando{animation:surgir .7s cubic-bezier(.2,.9,.2,1) both}
+@keyframes surgir{from{opacity:0; transform:translateY(26px) scale(.985)} to{opacity:1; transform:none}}
+.revelacion::after{ /* destello que barre el panel al aparecer */
+  content:""; position:absolute; inset:0; pointer-events:none;
+  background:linear-gradient(105deg, transparent 38%, rgba(240,230,210,.16) 50%, transparent 62%);
+  transform:translateX(-120%);
+}
+.revelacion.entrando::after{animation:barrido 1.1s .25s ease-out both}
+@keyframes barrido{to{transform:translateX(120%)}}
+
+.reja{
+  display:grid;
+  grid-template-columns:1fr minmax(0,2.1fr) 1fr;
+  align-items:center; gap:clamp(10px,2.6vw,30px);
+}
+.lado{min-width:0}
+.lado__rol{
+  display:block; font-size:10px; letter-spacing:.36em;
+  text-transform:uppercase; color:var(--humo); margin-bottom:8px;
+}
+.lado__nombre{
+  display:block; font-family:var(--display); font-weight:600;
+  font-size:clamp(15px,2.3vw,26px);
+  color:var(--oro); line-height:1.15;
+  overflow-wrap:anywhere;
+}
+.lado--b{text-align:right}
+
+.centro{text-align:center; min-width:0}
+.centro__eyebrow{
+  margin:0 0 10px; font-size:11px; letter-spacing:.4em;
+  text-transform:uppercase; color:var(--arcano);
+}
+
+/* Retrato: aparece solo cuando hay imagen configurada */
+.retrato{
+  margin:0 auto 18px;
+  width:clamp(150px,26vw,240px);
+  aspect-ratio:1;
+  border:1px solid rgba(200,170,110,.45);
+  border-radius:50%;
+  overflow:hidden;
+  box-shadow:0 0 60px -18px var(--oro), inset 0 0 40px -12px #000;
+}
+.retrato[hidden]{display:none}
+.retrato img{width:100%; height:100%; object-fit:cover; display:block}
+
+.campeon{
+  margin:0;
+  font-family:var(--display); font-weight:900;
+  font-size:clamp(34px,8.6vw,86px);
+  line-height:1; letter-spacing:.01em;
+  text-transform:uppercase;
+  background:linear-gradient(180deg,#FFFBF0 6%, var(--oro-claro) 34%, var(--oro) 66%, #8A6A34 100%);
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+  filter:drop-shadow(0 0 34px rgba(200,170,110,.35));
+  overflow-wrap:anywhere;
+}
+.campeon .letra{
+  display:inline-block;
+  background:linear-gradient(180deg,#FFFBF0 6%, var(--oro-claro) 34%, var(--oro) 66%, #8A6A34 100%);
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+  animation:aterrizar .5s cubic-bezier(.2,.9,.2,1) both;
+}
+.campeon .espacio{display:inline-block; width:.28em}
+@keyframes aterrizar{
+  from{opacity:0; transform:translateY(-.34em) scale(1.5); filter:blur(6px)}
+  to{opacity:1; transform:none; filter:none}
+}
+/* Reflejo: el eco invertido del nombre, porque el duelo es un espejo */
+.reflejo{
+  margin:2px 0 0;
+  font-family:var(--display); font-weight:900;
+  font-size:clamp(34px,8.6vw,86px); line-height:1; text-transform:uppercase;
+  letter-spacing:.01em;
+  color:rgba(200,170,110,.3);
+  transform:scaleY(-1);
+  mask-image:linear-gradient(180deg, transparent 8%, #000 92%);
+  -webkit-mask-image:linear-gradient(180deg, transparent 8%, #000 92%);
+  overflow-wrap:anywhere;
+  user-select:none;
+}
+/* nombres largos: mismo escalón para el nombre y su reflejo */
+.campeon--largo, .reflejo.campeon--largo{font-size:clamp(26px,6.2vw,62px)}
+.campeon--xlargo, .reflejo.campeon--xlargo{font-size:clamp(21px,4.8vw,48px)}
+
+.centro__pie{
+  margin:20px 0 0; font-size:12px; letter-spacing:.26em;
+  text-transform:uppercase; color:var(--humo);
+}
+
+.pie{
+  margin-top:36px; text-align:center;
+  font-size:11px; letter-spacing:.3em; text-transform:uppercase;
+  color:rgba(122,138,160,.6);
+}
+
+/* ─────────────────────────────────────────────
+   RESPONSIVE
+   ───────────────────────────────────────────── */
+@media (max-width:720px){
+  :root{--item-h:62px; --reel-h:186px}
+  .duelo{grid-template-columns:1fr; gap:14px}
+  .campo--b{text-align:left}
+  .campo--b input{text-align:left}
+  .campo--b label{align-self:flex-start}
+  .versus{padding:0; text-align:center}
+  .reja{grid-template-columns:1fr; gap:20px; text-align:center}
+  .lado,.lado--b{text-align:center}
+  .boton{width:100%}
+}
+
+@media (prefers-reduced-motion:reduce){
+  :root{--giro:900ms}
+  *,*::before,*::after{animation-duration:.01ms !important; animation-iteration-count:1 !important}
+  .cinta.rodando{filter:none}
+  .campeon .letra{animation:none}
+}
+</style>
+</head>
+<body>
+<main class="lienzo">
+
+  <header class="encabezado">
+    <p class="marca">Mirror Match</p>
+    <h1 class="titulo">La Ruleta del Espejo</h1>
+    <p class="bajada">Un solo campeón, dos invocadores. Escribe los nombres, gira la ruleta y ambos jugarán <b>el mismo campeón</b> entre los <b>173</b> de la Grieta.</p>
+  </header>
+
+  <section class="duelo">
+    <div class="campo campo--a">
+      <label for="nombre1">Invocador 1</label>
+      <input id="nombre1" type="text" placeholder="Nombre 1" autocomplete="off" maxlength="24">
+    </div>
+    <div class="versus" aria-hidden="true">VS</div>
+    <div class="campo campo--b">
+      <label for="nombre2">Invocador 2</label>
+      <input id="nombre2" type="text" placeholder="Nombre 2" autocomplete="off" maxlength="24">
+    </div>
+  </section>
+
+  <div class="acciones">
+    <button id="botonElegir" class="boton" type="button">Elegir campeón</button>
+  </div>
+
+  <section class="ruleta" id="ruleta" aria-hidden="true">
+    <div class="aro"></div>
+    <div class="tambor">
+      <div class="cinta" id="cinta"></div>
+      <div class="marcador"><span class="izq"></span><span class="der"></span></div>
+    </div>
+  </section>
+
+  <section class="revelacion" id="revelacion" hidden aria-live="polite">
+    <div class="reja">
+      <div class="lado lado--a">
+        <span class="lado__rol">Invocador 1</span>
+        <span class="lado__nombre" id="salidaNombre1">Invocador 1</span>
+      </div>
+
+      <div class="centro">
+        <!-- RETRATO: se muestra solo si hay imagen configurada (ver script) -->
+        <figure class="retrato" id="retrato" hidden>
+          <img id="imagenCampeon" src="" alt="">
+        </figure>
+
+        <p class="centro__eyebrow">Ambos juegan</p>
+        <h2 class="campeon" id="nombreCampeon"></h2>
+        <p class="reflejo" id="reflejoCampeon" aria-hidden="true"></p>
+        <p class="centro__pie">Duelo a espejo</p>
+      </div>
+
+      <div class="lado lado--b">
+        <span class="lado__rol">Invocador 2</span>
+        <span class="lado__nombre" id="salidaNombre2">Invocador 2</span>
+      </div>
+    </div>
+  </section>
+
+  <p class="pie">173 campeones · sorteo uniforme</p>
+</main>
+
+<script>
+/* ============================================================
+   1. CAMPEONES
+   Nombre visible -> slug oficial usado por leagueoflegends.com
+   ============================================================ */
+const CAMPEONES = {
+  "Aatrox": "aatrox",
+  "Ahri": "ahri",
+  "Akali": "akali",
+  "Akshan": "akshan",
+  "Alistar": "alistar",
+  "Ambessa": "ambessa",
+  "Amumu": "amumu",
+  "Anivia": "anivia",
+  "Annie": "annie",
+  "Aphelios": "aphelios",
+  "Ashe": "ashe",
+  "Aurelion Sol": "aurelionsol",
+  "Aurora": "aurora",
+  "Azir": "azir",
+  "Bard": "bard",
+  "Bel'Veth": "belveth",
+  "Blitzcrank": "blitzcrank",
+  "Brand": "brand",
+  "Braum": "braum",
+  "Briar": "briar",
+  "Caitlyn": "caitlyn",
+  "Camille": "camille",
+  "Cassiopeia": "cassiopeia",
+  "Cho'Gath": "chogath",
+  "Corki": "corki",
+  "Darius": "darius",
+  "Diana": "diana",
+  "Dr. Mundo": "drmundo",
+  "Draven": "draven",
+  "Ekko": "ekko",
+  "Elise": "elise",
+  "Evelynn": "evelynn",
+  "Ezreal": "ezreal",
+  "Fiddlesticks": "fiddlesticks",
+  "Fiora": "fiora",
+  "Fizz": "fizz",
+  "Galio": "galio",
+  "Gangplank": "gangplank",
+  "Garen": "garen",
+  "Gnar": "gnar",
+  "Gragas": "gragas",
+  "Graves": "graves",
+  "Gwen": "gwen",
+  "Hecarim": "hecarim",
+  "Heimerdinger": "heimerdinger",
+  "Hwei": "hwei",
+  "Illaoi": "illaoi",
+  "Irelia": "irelia",
+  "Ivern": "ivern",
+  "Janna": "janna",
+  "Jarvan IV": "jarvaniv",
+  "Jax": "jax",
+  "Jayce": "jayce",
+  "Jhin": "jhin",
+  "Jinx": "jinx",
+  "K'Sante": "ksante",
+  "Kai'Sa": "kaisa",
+  "Kalista": "kalista",
+  "Karma": "karma",
+  "Karthus": "karthus",
+  "Kassadin": "kassadin",
+  "Katarina": "katarina",
+  "Kayle": "kayle",
+  "Kayn": "kayn",
+  "Kennen": "kennen",
+  "Kha'Zix": "khazix",
+  "Kindred": "kindred",
+  "Kled": "kled",
+  "Kog'Maw": "kogmaw",
+  "LeBlanc": "leblanc",
+  "Lee Sin": "leesin",
+  "Leona": "leona",
+  "Lillia": "lillia",
+  "Lissandra": "lissandra",
+  "Locke": "locke",
+  "Lucian": "lucian",
+  "Lulu": "lulu",
+  "Lux": "lux",
+  "Malphite": "malphite",
+  "Malzahar": "malzahar",
+  "Maokai": "maokai",
+  "Master Yi": "masteryi",
+  "Mel": "mel",
+  "Milio": "milio",
+  "Miss Fortune": "missfortune",
+  "Mordekaiser": "mordekaiser",
+  "Morgana": "morgana",
+  "Naafiri": "naafiri",
+  "Nami": "nami",
+  "Nasus": "nasus",
+  "Nautilus": "nautilus",
+  "Neeko": "neeko",
+  "Nidalee": "nidalee",
+  "Nilah": "nilah",
+  "Nocturne": "nocturne",
+  "Nunu & Willump": "nunu",
+  "Olaf": "olaf",
+  "Orianna": "orianna",
+  "Ornn": "ornn",
+  "Pantheon": "pantheon",
+  "Poppy": "poppy",
+  "Pyke": "pyke",
+  "Qiyana": "qiyana",
+  "Quinn": "quinn",
+  "Rakan": "rakan",
+  "Rammus": "rammus",
+  "Rek'Sai": "reksai",
+  "Rell": "rell",
+  "Renata Glasc": "renata",
+  "Renekton": "renekton",
+  "Rengar": "rengar",
+  "Riven": "riven",
+  "Rumble": "rumble",
+  "Ryze": "ryze",
+  "Samira": "samira",
+  "Sejuani": "sejuani",
+  "Senna": "senna",
+  "Seraphine": "seraphine",
+  "Sett": "sett",
+  "Shaco": "shaco",
+  "Shen": "shen",
+  "Shyvana": "shyvana",
+  "Singed": "singed",
+  "Sion": "sion",
+  "Sivir": "sivir",
+  "Skarner": "skarner",
+  "Smolder": "smolder",
+  "Sona": "sona",
+  "Soraka": "soraka",
+  "Swain": "swain",
+  "Sylas": "sylas",
+  "Syndra": "syndra",
+  "Tahm Kench": "tahmkench",
+  "Taliyah": "taliyah",
+  "Talon": "talon",
+  "Taric": "taric",
+  "Teemo": "teemo",
+  "Thresh": "thresh",
+  "Tristana": "tristana",
+  "Trundle": "trundle",
+  "Tryndamere": "tryndamere",
+  "Twisted Fate": "twistedfate",
+  "Twitch": "twitch",
+  "Udyr": "udyr",
+  "Urgot": "urgot",
+  "Varus": "varus",
+  "Vayne": "vayne",
+  "Veigar": "veigar",
+  "Vel'Koz": "velkoz",
+  "Vex": "vex",
+  "Vi": "vi",
+  "Viego": "viego",
+  "Viktor": "viktor",
+  "Vladimir": "vladimir",
+  "Volibear": "volibear",
+  "Warwick": "warwick",
+  "Wukong": "monkeyking",
+  "Xayah": "xayah",
+  "Xerath": "xerath",
+  "Xin Zhao": "xinzhao",
+  "Yasuo": "yasuo",
+  "Yone": "yone",
+  "Yorick": "yorick",
+  "Yunara": "yunara",
+  "Yuumi": "yuumi",
+  "Zaahen": "zaahen",
+  "Zac": "zac",
+  "Zed": "zed",
+  "Zeri": "zeri",
+  "Ziggs": "ziggs",
+  "Zilean": "zilean",
+  "Zoe": "zoe",
+  "Zyra": "zyra"
+};
+const NOMBRES = Object.keys(CAMPEONES);
+
+/* ============================================================
+   2. IMÁGENES (SPLASH ART) — LO ÚNICO QUE DEBES EDITAR DESPUÉS
+   ------------------------------------------------------------
+   Hoy la ruleta funciona solo con texto porque RUTA_IMAGENES
+   está vacía. Cuando descargues los splash art:
+
+   a) Deja las imágenes en una carpeta junto a este HTML,
+      por ejemplo:  splash/aatrox.jpg, splash/ahri.jpg, ...
+   b) Escribe esa carpeta en RUTA_IMAGENES (con la barra final)
+      y la extensión en EXTENSION_IMAGENES.
+   c) El archivo se arma como: RUTA + slug + EXTENSION,
+      usando el slug del listado de arriba. Ojo con los tres
+      casos raros: Wukong = "monkeyking", Nunu & Willump = "nunu",
+      Renata Glasc = "renata".
+   d) ¿Algún archivo con otro nombre? Ponlo en IMAGENES_MANUAL
+      y esa ruta manda sobre todo lo demás.
+
+   Si una imagen no carga, el retrato se oculta solo y la
+   revelación sigue funcionando con el texto grande.
+   ============================================================ */
+const RUTA_IMAGENES = "";          // ej: "splash/"
+const EXTENSION_IMAGENES = ".jpg"; // ej: ".jpg" | ".png" | ".webp"
+const IMAGENES_MANUAL = {
+  // "Nunu & Willump": "splash/nunu-y-willump.jpg",
+  // "Wukong": "splash/wukong.png",
+};
+
+function rutaImagen(nombre){
+  if (IMAGENES_MANUAL[nombre]) return IMAGENES_MANUAL[nombre];
+  if (!RUTA_IMAGENES) return "";
+  return RUTA_IMAGENES + CAMPEONES[nombre] + EXTENSION_IMAGENES;
+}
+
+/* ============================================================
+   3. RULETA
+   ============================================================ */
+const boton      = document.getElementById("botonElegir");
+const ruleta     = document.getElementById("ruleta");
+const cinta      = document.getElementById("cinta");
+const revelacion = document.getElementById("revelacion");
+const retrato    = document.getElementById("retrato");
+const imagen     = document.getElementById("imagenCampeon");
+const tituloCamp = document.getElementById("nombreCampeon");
+const reflejo    = document.getElementById("reflejoCampeon");
+
+const LARGO_CINTA = 58;   // ranuras antes del ganador
+let girando = false;
+
+const reducirMovimiento = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function azar(max){
+  if (window.crypto && crypto.getRandomValues){
+    const tope = Math.floor(4294967296 / max) * max;
+    const buf = new Uint32Array(1);
+    let n;
+    do { crypto.getRandomValues(buf); n = buf[0]; } while (n >= tope);
+    return n % max;
+  }
+  return Math.floor(Math.random() * max);
+}
+const campeonAlAzar = () => NOMBRES[azar(NOMBRES.length)];
+
+function alturaRanura(){
+  return parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--item-h"));
+}
+
+function armarCinta(ganador){
+  const ranuras = [];
+  for (let i = 0; i < LARGO_CINTA; i++) ranuras.push(campeonAlAzar());
+  ranuras.push(ganador);                       // índice LARGO_CINTA
+  for (let i = 0; i < 4; i++) ranuras.push(campeonAlAzar());
+
+  cinta.innerHTML = ranuras
+    .map(n => '<div class="ranura">' + n.replace(/&/g, "&amp;").replace(/</g, "&lt;") + "</div>")
+    .join("");
+  return LARGO_CINTA;
+}
+
+function girar(){
+  if (girando) return;
+  girando = true;
+
+  const ganador = campeonAlAzar();
+  const indice  = armarCinta(ganador);
+
+  boton.disabled = true;
+  boton.textContent = "Girando…";
+  revelacion.hidden = true;
+  revelacion.classList.remove("entrando");
+  ruleta.classList.add("girando");
+
+  // posición inicial
+  cinta.style.transition = "none";
+  cinta.style.transform  = "translateY(0px)";
+  cinta.classList.add("rodando");
+
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    const dur = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--giro"));
+    cinta.style.transition = "transform " + dur + "ms cubic-bezier(.07,.72,.05,1)";
+    cinta.style.transform  = "translateY(" + (-indice * alturaRanura()) + "px)";
+
+    // el desenfoque se retira cuando la ruleta ya frenó lo suficiente
+    setTimeout(() => cinta.classList.remove("rodando"), dur * 0.62);
+    setTimeout(() => terminar(ganador), dur + 90);
+  }));
+}
+
+function terminar(ganador){
+  girando = false;
+  ruleta.classList.remove("girando");
+  boton.disabled = false;
+  boton.textContent = "Girar de nuevo";
+  mostrar(ganador);
+}
+
+/* ============================================================
+   4. REVELACIÓN
+   ============================================================ */
+function mostrar(campeon){
+  const n1 = document.getElementById("nombre1").value.trim() || "Invocador 1";
+  const n2 = document.getElementById("nombre2").value.trim() || "Invocador 2";
+  document.getElementById("salidaNombre1").textContent = n1;
+  document.getElementById("salidaNombre2").textContent = n2;
+
+  // nombre grande, letra por letra
+  const escalon = campeon.length > 14 ? " campeon--xlargo"
+                : campeon.length > 9  ? " campeon--largo"
+                : "";
+  tituloCamp.className = "campeon" + escalon;
+  reflejo.className    = "reflejo" + escalon;
+
+  tituloCamp.textContent = "";
+  [...campeon].forEach((c, i) => {
+    const s = document.createElement("span");
+    s.className = c === " " ? "espacio" : "letra";
+    s.textContent = c === " " ? "" : c;
+    if (c !== " ") s.style.animationDelay = (reducirMovimiento ? 0 : i * 45) + "ms";
+    tituloCamp.appendChild(s);
+  });
+  reflejo.textContent = campeon;
+
+  // imagen opcional
+  const src = rutaImagen(campeon);
+  if (src){
+    imagen.onerror = () => { retrato.hidden = true; };
+    imagen.onload  = () => { retrato.hidden = false; };
+    imagen.alt = "Splash art de " + campeon;
+    imagen.src = src;
+  } else {
+    retrato.hidden = true;
+    imagen.removeAttribute("src");
+  }
+
+  revelacion.hidden = false;
+  void revelacion.offsetWidth;      // reinicia la animación de entrada
+  revelacion.classList.add("entrando");
+  revelacion.scrollIntoView({ behavior: reducirMovimiento ? "auto" : "smooth", block: "center" });
+}
+
+/* ============================================================
+   5. ARRANQUE
+   ============================================================ */
+boton.addEventListener("click", girar);
+document.querySelectorAll(".campo input").forEach(i => {
+  i.addEventListener("keydown", e => { if (e.key === "Enter") girar(); });
+});
+
+// ranuras de reposo para que la ruleta no se vea vacía
+armarCinta(campeonAlAzar());
+cinta.style.transform = "translateY(" + (-3 * alturaRanura()) + "px)";
+</script>
+</body>
+</html>
