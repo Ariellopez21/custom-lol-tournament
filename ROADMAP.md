@@ -108,14 +108,14 @@ Leyenda: `- [ ]` pendiente · `- [x]` hecho · ⭐ = foco principal
 ## Fase 0 — Fundaciones
 El andamiaje mínimo para que todo lo demás se apoye.
 
-- [ ] **0.1** Inicializar el proyecto **Svelte + Vite** (esqueleto, scripts `dev`/`build`).
-- [ ] **0.2** Extraer el **design system** de `ruleta-espejo.html` a `ui/tokens.css` (colores, tipografías, sombras) reutilizable.
-- [ ] **0.3** Crear `core/champions.js` con los 173 campeones (id = championId DDragon) y su ruta de imagen.
-- [ ] **0.4** **Añadir la imagen faltante de Anivia** (`champs/Anivia.jpg`).
-- [ ] **0.5** Normalizar el *casing* de los nombres de archivo en `champs/` para que funcionen en GitHub Pages (Linux distingue mayúsculas: `Aatrox.jpg ≠ aatrox.jpg`).
-- [ ] **0.6** `core/store.js`: wrapper de localStorage con esquema versionado (para migraciones futuras).
-- [ ] **0.7** `core/export.js`: exportar/importar todo el estado a un `.json` (respaldo y compartir).
-- [ ] **0.8** App shell + navegación básica (Combate · Participantes · Torneos · Temporadas).
+- [x] **0.1** Inicializar el proyecto **Svelte + Vite** (esqueleto, scripts `dev`/`build`).
+- [x] **0.2** Extraer el **design system** de `ruleta-espejo.html` a `ui/tokens.css` (colores, tipografías, sombras) reutilizable.
+- [x] **0.3** Crear `core/champions.js` con los 173 campeones (id = championId DDragon) y su ruta de imagen.
+- [x] **0.4** **Añadir la imagen faltante de Anivia** (`champs/Anivia.jpg`).
+- [x] **0.5** Normalizar el *casing* de los nombres de archivo en `champs/` para que funcionen en GitHub Pages (Linux distingue mayúsculas: `Aatrox.jpg ≠ aatrox.jpg`).
+- [x] **0.6** `core/store.js`: wrapper de localStorage con esquema versionado (para migraciones futuras).
+- [x] **0.7** `core/export.js`: exportar/importar todo el estado a un `.json` (respaldo y compartir).
+- [x] **0.8** App shell + navegación básica (Combate · Participantes · Torneos · Temporadas).
 
 ## Fase 1 — ⭐ Sistema de Combate (EL FOCO)
 La joya. Un duelo 1v1 ARAM configurable, resuelto con ruletas teatrales.

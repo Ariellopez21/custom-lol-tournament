@@ -1,0 +1,27 @@
+/*
+  Estilos globales base (fase 0.1 + 0.2).
+  Los tokens del design system viven en ui/tokens.css (colores, tipografías,
+  sombras); aquí solo se aplican al documento.
+*/
+
+@import './ui/tokens.css';
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+}
+
+body {
+  min-height: 100vh;
+  background: var(--fondo-app);
+  color: var(--oro-claro);
+  font-family: var(--fuente-ui);
+  font-weight: 300;
+  -webkit-font-smoothing: antialiased;
+}

@@ -1,0 +1,57 @@
+/**
+ * ui/tokens.css — Design system compartido (fase 0.2).
+ *
+ * Extraído de `ruleta-espejo.html`: la paleta "Grieta", las tipografías
+ * (Cinzel para display + Barlow Semi Condensed para UI) y las sombras/brillos
+ * que se repiten. Es la fuente de verdad visual; importar en cualquier
+ * componente o en el CSS global. Las fuentes se cargan en index.html.
+ */
+
+:root {
+  /* ── Paleta "Grieta" ───────────────────────────────── */
+  --abismo: #070b12;
+  --noche: #0c1526;
+  --piedra: #16233a;
+  --oro: #c8aa6e;
+  --oro-claro: #f0e6d2;
+  --arcano: #0ac8b9;
+  --sangre: #c0455c;
+  --humo: #7a8aa0;
+
+  /* ── Tipografías ───────────────────────────────────── */
+  --fuente-display: "Cinzel", "Trajan Pro", Georgia, serif;
+  --fuente-ui: "Barlow Semi Condensed", "Roboto Condensed", system-ui, sans-serif;
+
+  /* ── Bordes dorados (opacidades habituales) ────────── */
+  --borde-oro-tenue: rgba(200, 170, 110, 0.16);
+  --borde-oro: rgba(200, 170, 110, 0.28);
+  --borde-oro-fuerte: rgba(200, 170, 110, 0.45);
+  --borde-arcano: rgba(10, 200, 185, 0.55);
+
+  /* ── Fondos compuestos ─────────────────────────────── */
+  --fondo-app:
+    radial-gradient(1100px 700px at 50% -10%, #16304a 0%, transparent 62%),
+    radial-gradient(800px 500px at 50% 108%, #12253c 0%, transparent 60%),
+    var(--abismo);
+
+  /* ── Degradados dorados para texto (títulos, campeón) ─ */
+  --oro-degradado: linear-gradient(180deg, #fff7e4 8%, var(--oro) 58%, #8a6e3c 100%);
+  --oro-degradado-fuerte:
+    linear-gradient(180deg, #fffbf0 6%, var(--oro-claro) 34%, var(--oro) 66%, #8a6a34 100%);
+
+  /* ── Sombras y brillos reutilizables ───────────────── */
+  --brillo-arcano: 0 0 0 1px var(--arcano), 0 0 26px -8px var(--arcano);
+  --sombra-boton: 0 0 0 1px rgba(0, 0, 0, 0.6), 0 14px 40px -18px var(--oro);
+  --sombra-boton-hover: 0 0 0 1px rgba(0, 0, 0, 0.6), 0 20px 46px -16px var(--oro);
+  --sombra-retrato: 0 0 60px -18px var(--oro), inset 0 0 40px -12px #000;
+  --sombra-tambor: inset 0 0 90px -20px #000;
+  --brillo-sangre: 0 0 24px rgba(192, 69, 92, 0.5);
+}
+
+/* Utilidad: texto con relleno dorado (títulos, nombre de campeón). */
+.texto-oro {
+  background: var(--oro-degradado);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}

@@ -1,0 +1,221 @@
+/**
+ * core/champions.js — Catálogo de los 173 campeones de LoL.
+ *
+ * `id` es el championId de Data Dragon (p. ej. `AurelionSol`, `MonkeyKing`,
+ * `Nunu`, `Renata`, `KSante`) y coincide, tal cual, con el nombre de archivo
+ * en `champs/` (`champs/<id>.jpg`). El casing importa: GitHub Pages corre en
+ * Linux y distingue mayúsculas.
+ *
+ * Este archivo se genera; no editar a mano. Fuente: champs.txt + champs/.
+ * El campo `img` se resuelve con Vite (bundling + hashing) vía import.meta.glob,
+ * así los retratos funcionan en dev y en el build estático sin depender de rutas.
+ */
+
+// DECISIÓN (0.3/0.5): resolvemos las imágenes con import.meta.glob en vez de
+// guardar un string literal tipo "champs/<id>.jpg" en cada Champion.
+//   · Por qué glob y no una ruta literal: así Vite las procesa, las bundlea con
+//     hash y quedan en el build estático. Una ruta relativa suelta se rompería
+//     en GitHub Pages (base "/custom-lol-tournament/") según la ruta del navegador.
+//   · Por qué champs/ sigue en la raíz (no en public/): respeta la estructura del
+//     ROADMAP y donde ya viven las imágenes; glob las referencia desde ahí (../../).
+//   · El casing del id es sensible: Pages corre en Linux (Aatrox.jpg != aatrox.jpg).
+const RETRATOS = import.meta.glob('../../champs/*.jpg', {
+  eager: true,
+  query: '?url',
+  import: 'default',
+})
+
+/** Devuelve la URL del retrato para un championId. */
+export function imgCampeon(id) {
+  return RETRATOS[`../../champs/${id}.jpg`]
+}
+
+/** @typedef {{ id: string, nombre: string, img: string }} Champion */
+
+const DATOS = [
+  { id: "Aatrox", nombre: "Aatrox" },
+  { id: "Ahri", nombre: "Ahri" },
+  { id: "Akali", nombre: "Akali" },
+  { id: "Akshan", nombre: "Akshan" },
+  { id: "Alistar", nombre: "Alistar" },
+  { id: "Ambessa", nombre: "Ambessa" },
+  { id: "Amumu", nombre: "Amumu" },
+  { id: "Anivia", nombre: "Anivia" },
+  { id: "Annie", nombre: "Annie" },
+  { id: "Aphelios", nombre: "Aphelios" },
+  { id: "Ashe", nombre: "Ashe" },
+  { id: "AurelionSol", nombre: "Aurelion Sol" },
+  { id: "Aurora", nombre: "Aurora" },
+  { id: "Azir", nombre: "Azir" },
+  { id: "Bard", nombre: "Bard" },
+  { id: "Belveth", nombre: "Bel'Veth" },
+  { id: "Blitzcrank", nombre: "Blitzcrank" },
+  { id: "Brand", nombre: "Brand" },
+  { id: "Braum", nombre: "Braum" },
+  { id: "Briar", nombre: "Briar" },
+  { id: "Caitlyn", nombre: "Caitlyn" },
+  { id: "Camille", nombre: "Camille" },
+  { id: "Cassiopeia", nombre: "Cassiopeia" },
+  { id: "Chogath", nombre: "Cho'Gath" },
+  { id: "Corki", nombre: "Corki" },
+  { id: "Darius", nombre: "Darius" },
+  { id: "Diana", nombre: "Diana" },
+  { id: "DrMundo", nombre: "Dr. Mundo" },
+  { id: "Draven", nombre: "Draven" },
+  { id: "Ekko", nombre: "Ekko" },
+  { id: "Elise", nombre: "Elise" },
+  { id: "Evelynn", nombre: "Evelynn" },
+  { id: "Ezreal", nombre: "Ezreal" },
+  { id: "Fiddlesticks", nombre: "Fiddlesticks" },
+  { id: "Fiora", nombre: "Fiora" },
+  { id: "Fizz", nombre: "Fizz" },
+  { id: "Galio", nombre: "Galio" },
+  { id: "Gangplank", nombre: "Gangplank" },
+  { id: "Garen", nombre: "Garen" },
+  { id: "Gnar", nombre: "Gnar" },
+  { id: "Gragas", nombre: "Gragas" },
+  { id: "Graves", nombre: "Graves" },
+  { id: "Gwen", nombre: "Gwen" },
+  { id: "Hecarim", nombre: "Hecarim" },
+  { id: "Heimerdinger", nombre: "Heimerdinger" },
+  { id: "Hwei", nombre: "Hwei" },
+  { id: "Illaoi", nombre: "Illaoi" },
+  { id: "Irelia", nombre: "Irelia" },
+  { id: "Ivern", nombre: "Ivern" },
+  { id: "Janna", nombre: "Janna" },
+  { id: "JarvanIV", nombre: "Jarvan IV" },
+  { id: "Jax", nombre: "Jax" },
+  { id: "Jayce", nombre: "Jayce" },
+  { id: "Jhin", nombre: "Jhin" },
+  { id: "Jinx", nombre: "Jinx" },
+  { id: "KSante", nombre: "K'Sante" },
+  { id: "Kaisa", nombre: "Kai'Sa" },
+  { id: "Kalista", nombre: "Kalista" },
+  { id: "Karma", nombre: "Karma" },
+  { id: "Karthus", nombre: "Karthus" },
+  { id: "Kassadin", nombre: "Kassadin" },
+  { id: "Katarina", nombre: "Katarina" },
+  { id: "Kayle", nombre: "Kayle" },
+  { id: "Kayn", nombre: "Kayn" },
+  { id: "Kennen", nombre: "Kennen" },
+  { id: "Khazix", nombre: "Kha'Zix" },
+  { id: "Kindred", nombre: "Kindred" },
+  { id: "Kled", nombre: "Kled" },
+  { id: "KogMaw", nombre: "Kog'Maw" },
+  { id: "Leblanc", nombre: "LeBlanc" },
+  { id: "LeeSin", nombre: "Lee Sin" },
+  { id: "Leona", nombre: "Leona" },
+  { id: "Lillia", nombre: "Lillia" },
+  { id: "Lissandra", nombre: "Lissandra" },
+  { id: "Locke", nombre: "Locke" },
+  { id: "Lucian", nombre: "Lucian" },
+  { id: "Lulu", nombre: "Lulu" },
+  { id: "Lux", nombre: "Lux" },
+  { id: "Malphite", nombre: "Malphite" },
+  { id: "Malzahar", nombre: "Malzahar" },
+  { id: "Maokai", nombre: "Maokai" },
+  { id: "MasterYi", nombre: "Master Yi" },
+  { id: "Mel", nombre: "Mel" },
+  { id: "Milio", nombre: "Milio" },
+  { id: "MissFortune", nombre: "Miss Fortune" },
+  { id: "Mordekaiser", nombre: "Mordekaiser" },
+  { id: "Morgana", nombre: "Morgana" },
+  { id: "Naafiri", nombre: "Naafiri" },
+  { id: "Nami", nombre: "Nami" },
+  { id: "Nasus", nombre: "Nasus" },
+  { id: "Nautilus", nombre: "Nautilus" },
+  { id: "Neeko", nombre: "Neeko" },
+  { id: "Nidalee", nombre: "Nidalee" },
+  { id: "Nilah", nombre: "Nilah" },
+  { id: "Nocturne", nombre: "Nocturne" },
+  { id: "Nunu", nombre: "Nunu & Willump" },
+  { id: "Olaf", nombre: "Olaf" },
+  { id: "Orianna", nombre: "Orianna" },
+  { id: "Ornn", nombre: "Ornn" },
+  { id: "Pantheon", nombre: "Pantheon" },
+  { id: "Poppy", nombre: "Poppy" },
+  { id: "Pyke", nombre: "Pyke" },
+  { id: "Qiyana", nombre: "Qiyana" },
+  { id: "Quinn", nombre: "Quinn" },
+  { id: "Rakan", nombre: "Rakan" },
+  { id: "Rammus", nombre: "Rammus" },
+  { id: "RekSai", nombre: "Rek'Sai" },
+  { id: "Rell", nombre: "Rell" },
+  { id: "Renata", nombre: "Renata Glasc" },
+  { id: "Renekton", nombre: "Renekton" },
+  { id: "Rengar", nombre: "Rengar" },
+  { id: "Riven", nombre: "Riven" },
+  { id: "Rumble", nombre: "Rumble" },
+  { id: "Ryze", nombre: "Ryze" },
+  { id: "Samira", nombre: "Samira" },
+  { id: "Sejuani", nombre: "Sejuani" },
+  { id: "Senna", nombre: "Senna" },
+  { id: "Seraphine", nombre: "Seraphine" },
+  { id: "Sett", nombre: "Sett" },
+  { id: "Shaco", nombre: "Shaco" },
+  { id: "Shen", nombre: "Shen" },
+  { id: "Shyvana", nombre: "Shyvana" },
+  { id: "Singed", nombre: "Singed" },
+  { id: "Sion", nombre: "Sion" },
+  { id: "Sivir", nombre: "Sivir" },
+  { id: "Skarner", nombre: "Skarner" },
+  { id: "Smolder", nombre: "Smolder" },
+  { id: "Sona", nombre: "Sona" },
+  { id: "Soraka", nombre: "Soraka" },
+  { id: "Swain", nombre: "Swain" },
+  { id: "Sylas", nombre: "Sylas" },
+  { id: "Syndra", nombre: "Syndra" },
+  { id: "TahmKench", nombre: "Tahm Kench" },
+  { id: "Taliyah", nombre: "Taliyah" },
+  { id: "Talon", nombre: "Talon" },
+  { id: "Taric", nombre: "Taric" },
+  { id: "Teemo", nombre: "Teemo" },
+  { id: "Thresh", nombre: "Thresh" },
+  { id: "Tristana", nombre: "Tristana" },
+  { id: "Trundle", nombre: "Trundle" },
+  { id: "Tryndamere", nombre: "Tryndamere" },
+  { id: "TwistedFate", nombre: "Twisted Fate" },
+  { id: "Twitch", nombre: "Twitch" },
+  { id: "Udyr", nombre: "Udyr" },
+  { id: "Urgot", nombre: "Urgot" },
+  { id: "Varus", nombre: "Varus" },
+  { id: "Vayne", nombre: "Vayne" },
+  { id: "Veigar", nombre: "Veigar" },
+  { id: "Velkoz", nombre: "Vel'Koz" },
+  { id: "Vex", nombre: "Vex" },
+  { id: "Vi", nombre: "Vi" },
+  { id: "Viego", nombre: "Viego" },
+  { id: "Viktor", nombre: "Viktor" },
+  { id: "Vladimir", nombre: "Vladimir" },
+  { id: "Volibear", nombre: "Volibear" },
+  { id: "Warwick", nombre: "Warwick" },
+  { id: "MonkeyKing", nombre: "Wukong" },
+  { id: "Xayah", nombre: "Xayah" },
+  { id: "Xerath", nombre: "Xerath" },
+  { id: "XinZhao", nombre: "Xin Zhao" },
+  { id: "Yasuo", nombre: "Yasuo" },
+  { id: "Yone", nombre: "Yone" },
+  { id: "Yorick", nombre: "Yorick" },
+  { id: "Yunara", nombre: "Yunara" },
+  { id: "Yuumi", nombre: "Yuumi" },
+  { id: "Zaahen", nombre: "Zaahen" },
+  { id: "Zac", nombre: "Zac" },
+  { id: "Zed", nombre: "Zed" },
+  { id: "Zeri", nombre: "Zeri" },
+  { id: "Ziggs", nombre: "Ziggs" },
+  { id: "Zilean", nombre: "Zilean" },
+  { id: "Zoe", nombre: "Zoe" },
+  { id: "Zyra", nombre: "Zyra" },
+]
+
+/** Los 173 campeones, ordenados por nombre visible. @type {Champion[]} */
+export const CHAMPIONS = DATOS.map(c => ({ ...c, img: imgCampeon(c.id) }))
+
+/** Lista de championIds (útil para pools y sorteos). @type {string[]} */
+export const CHAMPION_IDS = CHAMPIONS.map(c => c.id)
+
+/** Lookup por id. @type {Map<string, Champion>} */
+export const championsById = new Map(CHAMPIONS.map(c => [c.id, c]))
+
+/** Devuelve un campeón por su id, o undefined. */
+export const getChampion = (id) => championsById.get(id)
