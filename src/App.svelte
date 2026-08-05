@@ -16,7 +16,7 @@
   ]
 
   // Sección activa según el hash; si es desconocido, cae en Combate.
-  const seccion = $derived(SECCIONES.find((s) => s.id === ruta.actual) ?? SECCIONES[0])
+  const seccion = $derived(SECCIONES.find((s) => s.id === ruta.seccion) ?? SECCIONES[0])
   const Vista = $derived(seccion.Vista)
 </script>
 

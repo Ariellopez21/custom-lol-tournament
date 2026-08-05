@@ -69,34 +69,59 @@ Participante {
   creadoEn
 }
 
-Reglas (preset de combate) {
-  id, nombre,
+ReglasCombate (el "ruleset"; se define al crear el torneo y se HEREDA por la ruleta) {
+  id?, nombre?,                          // si es un preset guardado (Fase 1.5)
+  resolucion: "ruleta" | "manual",       // 3.7 — ¿ruleta teatral o solo registrar resultado?
   formato: "Bo1" | "Bo3" | "Bo5",
-  mirror: bool,                 // mismo campeón para ambos
-  origen: "libre" | "pool",     // 173 campeones o el pool del jugador
-  restock: bool,                // ¿se puede repetir campeón entre games?
-  hechizos: "mismos" | "distintos" | "libres",
-  runas: "mismas" | "distintas" | "libres",
+  mirror: bool,                          // mismo campeón para ambos
+  championPool: bool,                    // la ruleta sortea desde los pools de cada uno
+  restock: bool,                         // ¿repetir campeón entre games?
+  hechizos: "predefinido" | "libre",     // solo etiqueta
+  runas: "predefinido" | "libre",        // solo etiqueta
   mapa: "ARAM", modo: "1v1",
   victoria: { creeps: 100, kills: 1, torres: 1 }   // editable
 }
 
-Duelo {
-  id, participantes: [idA, idB], reglas,
-  games: [ { n, campeones: {A,B}, hechizos:{A,B}, runas:{A,B}, ganador } ],
-  ganador, estado: "config"|"en_curso"|"terminado", creadoEn,
-  torneoId?                     // si nació dentro de un torneo
+Duelo (el combate atómico = unidad de la Fase 1; colección aparte para las stats) {
+  id, torneoId, etapaId,
+  participantes: [aId, bId],
+  reglas: ReglasCombate,                 // heredadas del torneo
+  marcador: { a, b },                    // MANUAL (ej. Bo5 → 3-1)  · 1.8
+  games: [ { n, campeones: {a, b} } ],   // solo si resolucion="ruleta" (fila 2 de jugados)
+  ganador: participanteId | null,        // null + estado "terminado" = EMPATE
+  estado: "pendiente" | "en_curso" | "terminado",
+  jugadoEn?
 }
 
-Torneo {
+Torneo (contenedor; puede tener VARIAS etapas bajo un mismo id) {
   id, nombre,
-  sistema: "brackets" | "grupos" | "suizo" | "tabla",
-  participantes: [ids], estructura: {...},   // bracket/grupos/rondas
-  duelos: [idsDeDuelo], clasificacion: [...],
-  estado, temporadaId?
+  estado: "borrador" | "en_curso" | "finalizado",
+  reglas: ReglasCombate,
+  participantes: [participanteId],
+  puntos: { victoria: 3, empate: 1, derrota: 0 },   // empates permitidos, configurable
+  etapas: [Etapa],                       // 3.3 — grupos → eliminatoria, etc.
+  campeon: participanteId | null,        // 3.6, al finalizar
+  creadoEn, actualizadoEn, temporadaId?
+}
+
+Etapa (una fase con su propio sistema) {
+  id, nombre, tipo: "tabla" | "grupos" | "bracket" | "suizo",
+  estado: "en_curso" | "finalizada",
+  participantes: [participanteId],       // top-N a mano de la etapa anterior, o todos
+  duelos: [dueloId],                     // todos los combates jugados en la etapa
+  grupos?:  [ { id, nombre, participantes:[id], duelos:[dueloId] } ],   // tipo "grupos"
+  bracket?: { rondas: [ { n, nombre, llaves:[Llave] } ] }               // tipo "bracket"
+}
+
+Llave (un cruce del bracket) {
+  id, a: participanteId|null, b: participanteId|null,   // null = por definir/bye
+  dueloId: dueloId|null, ganador: participanteId|null, avanzaA: llaveId|null
 }
 
 Temporada { id, nombre, torneos: [ids], inicio, fin? }
+
+// DERIVADO (no se guarda): clasificar(etapa) → filas con pts/rachas/H2H/movimiento;
+//   head2head(a,b), cambiosDeLiderato(etapa), rachaDe(id)…
 ```
 
 ---
@@ -183,15 +208,25 @@ La joya. Un duelo 1v1 ARAM configurable, resuelto con una ruleta teatral.
 - [x] ~~**2.3** Enlazar un duelo a dos participantes y cargar sus pools automáticamente.~~ *(descartado 2026-08-05: en realidad pertenece a la ruleta; el enlace duelo ↔ participantes se hará en la **Fase 1**. En modo dual, el pool de cada invocador sale de su propio champion pool — ver decisiones de Fase 1.)*
 
 ## Fase 3 — Sistemas de Torneo
-Cada partido del torneo lanza el sistema de combate de la Fase 1.
+Cada partido del torneo se resuelve con la ruleta (Fase 1) o registrando el resultado a mano.
 
-- [ ] **3.1** Asistente de creación de torneo (elegir participantes + sistema).
-- [ ] **3.2** **Brackets clásico** (eliminación simple; luego doble eliminación).
-- [ ] **3.3** **Fase de grupos** (sorteo de grupos + round-robin interno).
-- [ ] **3.4** **Sistema suizo** (emparejamiento por puntaje, sin repetir rivales).
-- [ ] **3.5** **Campeonato por tabla de puntuación** (todos contra todos + tabla).
-- [ ] **3.6** Visualización: bracket interactivo, tablas de posiciones, avance de rondas.
-- [ ] **3.7** Integración: al abrir un partido del torneo se dispara el Duelo y el resultado vuelve al torneo.
+> 📌 **Decisiones congeladas (2026-08-05).** Modelo de datos arriba (🗄️). **Orden de construcción dentro de la fase:** `3.1 → 3.5 → 3.6 → 3.2 → 3.3 → (3.4 futuro) → 3.7`.
+
+### Decisiones de diseño
+- **Un torneo = varias `etapas`** bajo un mismo id (grupos → eliminatoria, etc.). Avanzar entre etapas es **manual** (sin auto-clasificación: los cuadres no siempre calzan —6 grupos, repechajes para subir a 18 o bajar a 8— y se resuelven a mano).
+- **Clasificación derivada:** la tabla NO se guarda; se **calcula** de los duelos terminados (puntos, rachas, head-to-head, cambios de liderato…). El humano solo marca ganadores.
+- **Resolución por combate (regla del torneo):** `ruleta` (teatral, Fase 1) o `manual` (pestaña **ENFRENTAMIENTO**: solo se marca el resultado). Las reglas de ruleta (mirror/pool/restock) solo se piden si `resolucion="ruleta"`.
+- **Puntos:** empates permitidos (en grupos suele haber ida/vuelta). Por defecto **victoria = 3, empate = 1, derrota = 0** (configurable). Un `Duelo` terminado con `ganador=null` = empate.
+- **Emparejamiento del "ELEGIR COMBATE":** azar inteligente (prioriza menos partidos jugados + menos enfrentados, evita revancha inmediata).
+
+### Sub-puntos
+- [x] **3.1** **Asistente de creación**: nombre + participantes inscritos + sistema de la 1ª etapa + **reglas del torneo** (ruleset, con puntos y empates). *(Hecho: `TorneoVista.svelte` con el asistente + listado; store `crearTorneo`/`borrarTorneo`. La 1ª etapa nace vacía; el sorteo de grupos/llaves y la tabla los llenan 3.2/3.3/3.5.)*
+- [x] **3.5** ⭐ **Campeonato por tabla de puntuación** *(hecho)*: botón **ELEGIR COMBATE** (azar inteligente) → VS con marcador de games → resultado → la tabla se recalcula y **reordena animada** (`animate:flip`). Datos de show: 🔥 en racha, ✨ invicto, 😈 némesis (H2H), 👑 cambios de liderato, ▲▼ movimiento, medidor "en llamas", **toast festivo** por resultado. Desempates: puntos → H2H → diferencia de games → menos PJ. "Elegir a mano", deshacer último, finalizar/reabrir. *(Confeti + sonido quedan para el pulido / 1.11.)* Piezas: `core/clasificacion.js` (todo derivado), `TorneoDetalle.svelte`, router con `#/torneos/<id>`.
+- [ ] **3.6** **Visualización interactiva**: todo reactivo (deriva del estado); "Finalizar torneo" / "Elegir ganador".
+- [ ] **3.2** **Brackets clásico** (eliminación simple, **sin** doble eliminación): solo si participantes = **potencia de 2, ≥4 y ≤64** (4/8/16/32/64) — así no hay byes. Dos modos de siembra: **sorteo** automático, o **manual** (yo elijo cuántos invocadores y en qué llave va cada uno antes de empezar).
+- [ ] **3.3** **Fase de grupos** (multi-etapa, **TODO manual**): sorteo de grupos + integrantes; resultados a mano (empates/ida-vuelta posibles). "Finalizar fase de grupos" cierra la etapa y permite **abrir una nueva etapa** (bracket/otra) bajo el mismo torneo, eligiendo a mano quiénes pasan (repechajes incluidos).
+- [ ] **3.4** **Sistema suizo** — *(futuro; por ahora solo texto, no se implementa)*.
+- [ ] **3.7** **Integración ruleta ↔ torneo** *(se completa con la Fase 1)*: cambiar cómodo entre la **ruleta** (formato aleatorio) y la pestaña **ENFRENTAMIENTO** (resultado directo). El resultado vuelve al torneo y actualiza todo.
 
 ## Fase 4 — Temporadas & Registro
 - [ ] **4.1** Modelo de **Temporada**: agrupar torneos.
@@ -210,8 +245,8 @@ Cada partido del torneo lanza el sistema de combate de la Fase 1.
 
 ## 🔜 Próximo paso sugerido
 
-**Fase 0 ✅ · Fase 2 ✅** (2.3 descartado, se hará con la ruleta en la Fase 1). Siguiente en el orden de ejecución:
+**Fase 0 ✅ · Fase 2 ✅ · 3.1 ✅ · 3.5 ✅.** En la Fase 3, orden `3.1 → 3.5 → 3.6 → 3.2 → 3.3 → (3.4) → 3.7`:
 
-- **Fase 3 — Torneos.** Primer punto **3.1**: asistente de creación de torneo (elegir participantes + sistema).
+- **3.6** Visualización interactiva + pulir "Finalizar torneo / Elegir ganador". ← *siguiente*
 
 Tú decides el siguiente prompt; yo lo resuelvo y lo tachamos aquí.
