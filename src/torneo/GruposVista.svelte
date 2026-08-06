@@ -15,6 +15,8 @@
   } from '../core/estado.svelte.js'
   import { clasificar, elegirCombatePar } from '../core/clasificacion.js'
   import { barajar } from '../core/bracket.js'
+  import DueloRuleta from '../combate/DueloRuleta.svelte'
+  import ModalCombate from '../combate/ModalCombate.svelte'
 
   let { torneo, etapa } = $props()
 
@@ -82,6 +84,13 @@
   let selA = $state('')
   let selB = $state('')
 
+  // Cara del combate: ruleta (teatral) o manual (ENFRENTAMIENTO).
+  const esRuleta = $derived(torneo.reglas.resolucion === 'ruleta')
+  /** @type {{ a: string, b: string } | null} */
+  let sorteados = $state(null) // campeones sorteados por la ruleta (1.7); persisten en 1.10
+  // Grupo del combate en curso (para el modal de ruleta a nivel de vista).
+  const grupoActivo = $derived(combate ? grupos.find((g) => g.id === combate.grupoId) ?? null : null)
+
   const clamp = (/** @type {number} */ n) => Math.max(0, Math.min(maxLados, n))
   const puedeRegistrar = $derived(combate && (ga > 0 || gb > 0))
 
@@ -92,6 +101,7 @@
       ga = 0
       gb = 0
       manualEn = null
+      sorteados = null
     }
   }
   function cargarManual(/** @type {any} */ grupo) {
@@ -102,12 +112,14 @@
       manualEn = null
       selA = ''
       selB = ''
+      sorteados = null
     }
   }
   function cancelar() {
     combate = null
     ga = 0
     gb = 0
+    sorteados = null
   }
   function registrar() {
     if (!combate || (ga === 0 && gb === 0)) return
@@ -122,6 +134,20 @@
 </script>
 
 <div class="etapa-body">
+  {#snippet marca()}
+    <div class="vs__centro">
+      <div class="marcador">
+        <button class="paso" type="button" onclick={() => (ga = clamp(ga - 1))} aria-label="menos A">–</button>
+        <span class="paso__n">{ga}</span>
+        <button class="paso" type="button" onclick={() => (ga = clamp(ga + 1))} aria-label="más A">+</button>
+        <span class="paso__sep">:</span>
+        <button class="paso" type="button" onclick={() => (gb = clamp(gb - 1))} aria-label="menos B">–</button>
+        <span class="paso__n">{gb}</span>
+        <button class="paso" type="button" onclick={() => (gb = clamp(gb + 1))} aria-label="más B">+</button>
+      </div>
+      <span class="marcador__hint">{esRuleta ? 'marcador final · ' : ''}máx {maxLados} · empate permitido</span>
+    </div>
+  {/snippet}
   <p class="etapa-sub">
     {etapa?.nombre ?? 'Fase de grupos'} · {torneo.reglas.resolucion === 'ruleta' ? 'Ruleta' : 'Manual'}
     {torneo.reglas.formato} · {N} invocadores · {grupos.length}
@@ -233,27 +259,20 @@
 
           {#if jugables}
             {#if combate && combate.grupoId === grupo.id}
-              <div class="vs">
-                <span class="vs__nom">{nombreDe(combate.a)}</span>
-                <div class="vs__centro">
-                  <div class="marcador">
-                    <button class="paso" type="button" onclick={() => (ga = clamp(ga - 1))} aria-label="menos A">–</button>
-                    <span class="paso__n">{ga}</span>
-                    <button class="paso" type="button" onclick={() => (ga = clamp(ga + 1))} aria-label="más A">+</button>
-                    <span class="paso__sep">:</span>
-                    <button class="paso" type="button" onclick={() => (gb = clamp(gb - 1))} aria-label="menos B">–</button>
-                    <span class="paso__n">{gb}</span>
-                    <button class="paso" type="button" onclick={() => (gb = clamp(gb + 1))} aria-label="más B">+</button>
-                  </div>
-                  <span class="marcador__hint">máx {maxLados} · empate permitido</span>
+              {#if esRuleta}
+                <p class="en-curso">⚔️ Combate por ruleta en curso…</p>
+              {:else}
+                <div class="vs">
+                  <span class="vs__nom">{nombreDe(combate.a)}</span>
+                  {@render marca()}
+                  <span class="vs__nom">{nombreDe(combate.b)}</span>
                 </div>
-                <span class="vs__nom">{nombreDe(combate.b)}</span>
-              </div>
-              <div class="grupo__acc">
-                <button class="boton boton--sm" type="button" onclick={registrar} disabled={!puedeRegistrar}>Registrar</button>
-                <button class="mini" type="button" onclick={() => elegir(grupo)}>↻ Otro</button>
-                <button class="mini" type="button" onclick={cancelar}>✕</button>
-              </div>
+                <div class="grupo__acc">
+                  <button class="boton boton--sm" type="button" onclick={registrar} disabled={!puedeRegistrar}>Registrar</button>
+                  <button class="mini" type="button" onclick={() => elegir(grupo)}>↻ Otro</button>
+                  <button class="mini" type="button" onclick={cancelar}>✕</button>
+                </div>
+              {/if}
             {:else}
               <div class="grupo__acc">
                 <button class="elegir" type="button" onclick={() => elegir(grupo)} disabled={grupo.participantes.length < 2}>⚔️ Elegir combate</button>
@@ -281,6 +300,19 @@
         </div>
       {/each}
     </div>
+
+    <!-- Cara ruleta: modal/overlay "Pantalla VS" (1.6). -->
+    {#if esRuleta && combate && grupoActivo}
+      <ModalCombate onCerrar={cancelar} titulo={grupoActivo.nombre}>
+        <DueloRuleta a={combate.a} b={combate.b} reglas={torneo.reglas} onsorteo={(c) => (sorteados = c)} />
+        {@render marca()}
+        <div class="grupo__acc">
+          <button class="boton boton--sm" type="button" onclick={registrar} disabled={!puedeRegistrar}>Registrar</button>
+          <button class="mini" type="button" onclick={() => elegir(grupoActivo)}>↻ Otro</button>
+          <button class="mini" type="button" onclick={cancelar}>✕ Cancelar</button>
+        </div>
+      </ModalCombate>
+    {/if}
 
     <!-- Pie de la fase -->
     <div class="pie-acc">
@@ -498,6 +530,12 @@
     align-items: center;
     justify-content: center;
     gap: 0.4rem;
+  }
+  .en-curso {
+    margin: 0;
+    text-align: center;
+    font-size: 0.8rem;
+    color: var(--arcano);
   }
   .elegir {
     font-family: var(--fuente-display);

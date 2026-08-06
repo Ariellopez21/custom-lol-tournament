@@ -11,6 +11,8 @@
     finalizarTorneo,
   } from '../core/estado.svelte.js'
   import { clasificar, cambiosDeLiderato, nemesis, elegirCombatePar } from '../core/clasificacion.js'
+  import DueloRuleta from '../combate/DueloRuleta.svelte'
+  import ModalCombate from '../combate/ModalCombate.svelte'
 
   let { torneo, etapa } = $props()
 
@@ -54,6 +56,11 @@
   /** @type {ReturnType<typeof setTimeout> | undefined} */
   let timer
 
+  // Cara del combate: ruleta (teatral, hereda campeones) o manual (ENFRENTAMIENTO).
+  const esRuleta = $derived(torneo.reglas.resolucion === 'ruleta')
+  /** @type {{ a: string, b: string } | null} */
+  let sorteados = $state(null) // campeones que sorteó la ruleta (1.7); se persisten en 1.10
+
   const puedeRegistrar = $derived(combate && (ga > 0 || gb > 0))
 
   const nombreDe = (/** @type {string} */ id) =>
@@ -66,6 +73,7 @@
       ga = 0
       gb = 0
       manual = false
+      sorteados = null
     }
   }
   function cargarManual() {
@@ -74,12 +82,14 @@
       ga = 0
       gb = 0
       manual = false
+      sorteados = null
     }
   }
   function cancelar() {
     combate = null
     ga = 0
     gb = 0
+    sorteados = null
   }
   const clamp = (/** @type {number} */ n) => Math.max(0, Math.min(maxLados, n))
 
@@ -141,6 +151,26 @@
 </script>
 
 <div class="etapa-body">
+  {#snippet marca()}
+    <div class="vs__centro">
+      <div class="marcador">
+        <div class="lado-marca">
+          <button class="paso" type="button" onclick={() => (ga = clamp(ga - 1))} aria-label="Menos games a {nombreDe(combate?.a)}">–</button>
+          <span class="paso__n">{ga}</span>
+          <button class="paso" type="button" onclick={() => (ga = clamp(ga + 1))} aria-label="Más games a {nombreDe(combate?.a)}">+</button>
+        </div>
+        <span class="paso__vs">:</span>
+        <div class="lado-marca">
+          <button class="paso" type="button" onclick={() => (gb = clamp(gb - 1))} aria-label="Menos games a {nombreDe(combate?.b)}">–</button>
+          <span class="paso__n">{gb}</span>
+          <button class="paso" type="button" onclick={() => (gb = clamp(gb + 1))} aria-label="Más games a {nombreDe(combate?.b)}">+</button>
+        </div>
+      </div>
+      <span class="marcador__hint">
+        {esRuleta ? 'marcador final · games ganados' : 'games ganados'} · máx {maxLados}
+      </span>
+    </div>
+  {/snippet}
   <p class="etapa-sub">
     {etapa?.nombre ?? 'Liga'} · {torneo.reglas.resolucion === 'ruleta' ? 'Ruleta' : 'Manual'}
     {torneo.reglas.formato} · {etapa?.participantes.length ?? 0} invocadores · {duelos.length}
@@ -169,31 +199,20 @@
   {#if torneo.estado !== 'finalizado'}
     <div class="combate">
       {#if combate}
-        <div class="vs">
-          <span class="vs__nom vs__nom--a">{nombreDe(combate.a)}</span>
-          <div class="vs__centro">
-            <div class="marcador">
-              <div class="lado-marca">
-                <button class="paso" type="button" onclick={() => (ga = clamp(ga - 1))} aria-label="Menos games a {nombreDe(combate.a)}">–</button>
-                <span class="paso__n">{ga}</span>
-                <button class="paso" type="button" onclick={() => (ga = clamp(ga + 1))} aria-label="Más games a {nombreDe(combate.a)}">+</button>
-              </div>
-              <span class="paso__vs">:</span>
-              <div class="lado-marca">
-                <button class="paso" type="button" onclick={() => (gb = clamp(gb - 1))} aria-label="Menos games a {nombreDe(combate.b)}">–</button>
-                <span class="paso__n">{gb}</span>
-                <button class="paso" type="button" onclick={() => (gb = clamp(gb + 1))} aria-label="Más games a {nombreDe(combate.b)}">+</button>
-              </div>
-            </div>
-            <span class="marcador__hint">games ganados · máx {maxLados}</span>
+        {#if esRuleta}
+          <p class="en-curso">⚔️ Combate por ruleta en curso · <b>{nombreDe(combate.a)}</b> vs <b>{nombreDe(combate.b)}</b></p>
+        {:else}
+          <div class="vs">
+            <span class="vs__nom vs__nom--a">{nombreDe(combate.a)}</span>
+            {@render marca()}
+            <span class="vs__nom vs__nom--b">{nombreDe(combate.b)}</span>
           </div>
-          <span class="vs__nom vs__nom--b">{nombreDe(combate.b)}</span>
-        </div>
-        <div class="combate__acc">
-          <button class="boton" type="button" onclick={registrar} disabled={!puedeRegistrar}>Registrar resultado</button>
-          <button class="mini" type="button" onclick={elegir}>↻ Otro</button>
-          <button class="mini" type="button" onclick={cancelar}>✕ Cancelar</button>
-        </div>
+          <div class="combate__acc">
+            <button class="boton" type="button" onclick={registrar} disabled={!puedeRegistrar}>Registrar resultado</button>
+            <button class="mini" type="button" onclick={elegir}>↻ Otro</button>
+            <button class="mini" type="button" onclick={cancelar}>✕ Cancelar</button>
+          </div>
+        {/if}
       {:else}
         <button class="elegir" type="button" onclick={elegir} disabled={etapa.participantes.length < 2}>
           ⚔️ ELEGIR COMBATE
@@ -215,6 +234,19 @@
         {/if}
       {/if}
     </div>
+
+    <!-- Cara ruleta: modal/overlay "Pantalla VS" (1.6). -->
+    {#if esRuleta && combate}
+      <ModalCombate onCerrar={cancelar} titulo={etapa?.nombre ?? 'Liga'}>
+        <DueloRuleta a={combate.a} b={combate.b} reglas={torneo.reglas} onsorteo={(c) => (sorteados = c)} />
+        {@render marca()}
+        <div class="combate__acc">
+          <button class="boton" type="button" onclick={registrar} disabled={!puedeRegistrar}>Registrar resultado</button>
+          <button class="mini" type="button" onclick={elegir}>↻ Otro combate</button>
+          <button class="mini" type="button" onclick={cancelar}>✕ Cancelar</button>
+        </div>
+      </ModalCombate>
+    {/if}
   {/if}
 
   <!-- Tabla derivada -->
@@ -538,6 +570,16 @@
     justify-content: center;
     gap: 0.5rem;
     margin-top: 0.3rem;
+  }
+  .en-curso {
+    margin: 0;
+    text-align: center;
+    font-size: 0.85rem;
+    letter-spacing: 0.04em;
+    color: var(--arcano);
+  }
+  .en-curso b {
+    color: var(--oro-claro);
   }
 
   /* ── Tabla ───────────────────────────────────────── */

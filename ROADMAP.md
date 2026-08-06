@@ -158,12 +158,17 @@ La joya. Un duelo 1v1 ARAM configurable, resuelto con una ruleta teatral.
 ### 📌 Decisiones de diseño (congeladas 2026-08-05)
 
 - **La ruleta siempre ocurre entre 2 invocadores.** Los **dos nombres son obligatorios** para girar. En Fase 1 los invocadores vienen de Participantes reales (Fase 2) y/o del partido del torneo (Fase 3) — por eso 2 y 3 van antes.
+- **La ruleta ES el motor de combate del torneo (no una función suelta).** *(Aclarado 2026-08-06.)* Cada duelo del torneo se resuelve por una de **dos caras de la misma moneda**, según la regla `resolucion` heredada al crear el torneo:
+  1. `resolucion = "ruleta"` → al elegir combate se abre el **VS** y la **ruleta sortea el/los campeones** según las reglas (mirror/pool); esos campeones se **heredan** al duelo.
+  2. `resolucion = "manual"` → se pasa a la pantalla **ENFRENTAMIENTO** y solo se **marca el ganador** (sin sortear campeón).
+  Una **ruleta suelta sin invocadores/torneo** es un **extra futuro** (pantalla aparte con otras funcionalidades); por ahora **no** se diseña para ese caso. El `CombateVista` actual (pestaña "La Ruleta") queda como **banco de pruebas de desarrollo** hasta que, más adelante, se convierta en esa pantalla suelta.
 - **Única ruleta = campeones.** Hechizos y runas **no se sortean**.
 - **Hechizos y runas = solo una etiqueta** en la ficha del duelo: `Predefinido` o `Libre elección`. **No** hay selector de hechizos ni editor de páginas de runas (fuera de alcance por ahora).
 - **`champion pool` (sí/no) decide de dónde sortea la ruleta:**
   1. `pool = false` → sortea entre los **173** (en modo single o dual).
-  2. `pool = true` + **single (mirror)** → sortea **el mismo** campeón desde el champion pool para ambos. *(Pendiente por decidir en Fase 1: ¿de qué pool sale? probablemente la **intersección** de los pools de ambos invocadores.)*
-  3. `pool = true` + **dual (no-mirror)** → sortea un campeón **distinto** para cada invocador, **desde el pool propio de cada uno**.
+  2. `pool = true` + **single (mirror)** → sortea **el mismo** campeón desde la **unión** de los pools de ambos invocadores. *(Decidido 2026-08-06: **unión**, no intersección. Ej.: Inv1 = {A,B}, Inv2 = {C,D} ⇒ pool mirror = {A,B,C,D}.)* Por la convención **pool vacío = los 173**, si algún invocador no restringe su pool, la unión da los **173**.
+  3. `pool = true` + **dual (no-mirror)** → sortea un campeón **distinto** para cada invocador, **desde el pool propio de cada uno** (vacío = los 173).
+- **Mapeo de vocabulario (fijado 2026-08-06):** `mirror = ON ⇒ single` (1 resultado, ambos juegan el mismo) · `mirror = OFF ⇒ dual` (2 resultados, uno por invocador). El panel usa la etiqueta "Mirror match"; el motor de ruleta habla de single/dual.
 - **single (mirror) vs dual (no-mirror):** el componente `Ruleta` entrega **1** resultado (mirror, ambos juegan el mismo) o **2** (uno por invocador).
 - **El duelo NO es un flujo por games.** La ruleta dicta el duelo; el marcador solo registra el resultado final. No hay wizard game-a-game (perder tiempo con eso no aporta).
 - **Marcador = cuadro de 2 filas:**
@@ -179,22 +184,31 @@ La joya. Un duelo 1v1 ARAM configurable, resuelto con una ruleta teatral.
 - [x] **1.3** Conectar los retratos de `champs/` a la revelación (ya está el hueco `#retrato` en el prototipo). *(Hecho: revelación con retrato en **ambos** modos y **por lado** en dual, vía un `{#snippet revelacion}` reutilizable con variante compacta; los retratos ya salían en cada ranura del tambor desde 1.1.)*
 
 ### 1.b — Configuración de reglas
-- [ ] **1.4** Panel de reglas del duelo (en torneo, se **heredan** del torneo — Fase 3):
-  - [ ] Formato: **Bo1 / Bo3 / Bo5**
-  - [ ] **Mirror match** sí/no
-  - [ ] **Champion pool** sí/no (sí ⇒ la ruleta sortea desde los pools; ver decisiones)
-  - [ ] **Restock** sí/no (off ⇒ la ruleta elimina los campeones ya jugados)
-  - [ ] Hechizos: **Predefinido / Libre elección** *(solo etiqueta)*
-  - [ ] Runas: **Predefinido / Libre elección** *(solo etiqueta)*
-  - [ ] Reglas fijas visibles: **ARAM · 1v1 · 100 creeps | 1 kill | 1 tower**
-- [ ] **1.5** Guardar reglas como **presets** reutilizables (localStorage).
 
-### 1.c — Flujo de combate
-- [ ] **1.6** Pantalla **VS** con nombres y retratos de ambos invocadores (necesita invocadores).
-- [ ] **1.7** Giro de la ruleta según las reglas (**solo campeón**; sin hechizos/runas). Requiere ambos invocadores.
-- [ ] **1.8** **Marcador de 2 filas**: fila 1 = invocadores + marcador editable a mano; fila 2 = tira de campeones jugados.
+> 📌 **Plan acordado 2026-08-06.** El panel que pedía 1.4 **ya lo entregó 3.1** dentro del asistente de torneo (`TorneoVista.svelte`: resolución, formato, mirror, champion pool, restock, hechizos/runas y la línea fija ARAM·1v1) y el modelo `ReglasCombate` + `reglasPorDefecto()` ya viven en el store, con persistencia y el array `reglas[]` reservado para presets. Por eso 1.b se **reenfoca**:
+> - **1.4 = refactor + reúso**, no construir de cero: extraer ese `<fieldset class="reglas">` a un **componente compartido `PanelReglas.svelte`** y usarlo en (a) el asistente de torneo y (b) el **combate suelto** (que hoy sortea siempre sobre los 173, sin reglas). Una sola fuente de verdad.
+> - `victoria {creeps,kills,torres}` se queda **fija** (texto ARAM·1v1·100/1/1), **no editable**, por ahora.
+> - **1.5 = presets**: 1-2 de **fábrica** (p.ej. "ARAM 1v1 clásico") + **guardar / renombrar / borrar** los propios, elegibles al crear torneo y en combate suelto. Se apoyan en el array `reglas[]` ya reservado en el estado.
+
+- [x] **1.4** Extraer **`PanelReglas.svelte`** (fuente única) y reusarlo en torneo (reglas **heredadas**) y en combate suelto (editables en vivo). *(Hecho: `src/combate/PanelReglas.svelte` con props `bind:reglas`/`bind:puntos`, `leyenda`, `mostrarResolucion`, `mostrarPuntos` y `deshabilitado` —un `<fieldset disabled>` que bloquea todo el panel mientras gira—. `TorneoVista` migrado sin regresión; `CombateVista` lo usa y ahora el **Mirror del panel** deriva el modo single/dual, sustituyendo al selector segmentado hardcodeado. Champion pool/Restock quedan cableados pero su filtrado real llega en 1.7/1.9.)* El panel expone:
+  - [x] Formato: **Bo1 / Bo3 / Bo5**
+  - [x] **Mirror match** sí/no *(ON = single, OFF = dual)*
+  - [x] **Champion pool** sí/no (sí ⇒ la ruleta sortea desde los pools; **unión** en mirror, ver decisiones)
+  - [x] **Restock** sí/no (off ⇒ la ruleta elimina los campeones ya jugados)
+  - [x] Hechizos: **Predefinido / Libre elección** *(solo etiqueta)*
+  - [x] Runas: **Predefinido / Libre elección** *(solo etiqueta)*
+  - [x] Reglas fijas visibles: **ARAM · 1v1 · 100 creeps | 1 kill | 1 tower**
+- [ ] **1.5** Guardar reglas como **presets** reutilizables (localStorage): 1-2 de fábrica + gestión (guardar/renombrar/borrar) de los propios, usables en torneo y combate suelto.
+
+### 1.c — Flujo de combate (dentro del torneo)
+
+> 📌 **Re-plan acordado 2026-08-06.** 1.c **no** se construye en el banco suelto para después enchufarlo: se construye **directo como el puente Fase 1 ↔ Fase 3**, porque las vistas del torneo (Tabla/Grupos/Bracket) ya traen medio flujo montado (VS rudimentario + persistencia vía `registrarResultado`/`resolverLlave`). Por eso **3.7 se funde aquí dentro** (mismo trabajo). La cara **manual (ENFRENTAMIENTO)** ya existe hoy como el marcador `+/–`; lo que se construye de cero es la cara **ruleta** y el **gate por `reglas.resolucion`**. La ruleta se extrae a un **componente compartido `DueloRuleta.svelte`** que reusan las tres vistas (evita triplicar).
+
+- [x] **1.6** Pantalla **VS** con nombres y **retratos** de ambos invocadores, dentro del flujo del torneo. *(Hecho: `src/combate/DueloRuleta.svelte` — cabecera VS con ficha (avatar/inicial + nombre) de ambos invocadores. La cara ruleta se presenta en un **modal/overlay unificado `src/combate/ModalCombate.svelte`** (la "Pantalla VS" teatral) en las tres vistas del torneo — decidido 2026-08-06 para que no se sienta apretada (sobre todo en grupos) y dar espacio a la futura tira de "campeones jugados" en Bo3/Bo5. La cara manual/ENFRENTAMIENTO sigue inline.)*
+- [x] **1.7** Giro de la ruleta **según las reglas** (**solo campeón**; sin hechizos/runas) devolviendo el/los campeón(es) al duelo. *(Hecho en `DueloRuleta.svelte`: resuelve el pool según reglas —`championPool=false` ⇒ 173; **mirror** ⇒ 1 ruleta sobre la **unión** de pools; **dual** ⇒ 2 ruletas, cada una sobre el pool propio (vacío = 173)—, reusa `Ruleta.svelte`, revela el/los campeón(es) y los emite por `onsorteo`. Gateado por `reglas.resolucion === 'ruleta'` en Tabla/Grupos/Bracket. **= arranca 3.7.**)* Restock (excluir jugados) llega en 1.9.
+- [ ] **1.8** **Marcador de 2 filas**: fila 1 = invocadores + marcador editable a mano; fila 2 = tira de campeones jugados (solo cara ruleta).
 - [ ] **1.9** **Restock**: si off, excluir de la ruleta los campeones ya jugados; en Bo3/Bo5, eliminándolos game a game.
-- [ ] **1.10** Guardar el duelo terminado en el **historial de la DB del torneo** (`torneoId`).
+- [ ] **1.10** Guardar en el duelo del torneo los campeones sorteados (`games[]`) — cae casi solo: la persistencia del duelo (`torneoId`/`etapaId`) ya existe desde Fase 3.
 
 ### 1.d — Lo "épico" (creativo, factible)
 - [ ] **1.11** **Sonido** opcional (giro + fanfarria de revelación), con toggle de silencio.
@@ -226,7 +240,7 @@ Cada partido del torneo se resuelve con la ruleta (Fase 1) o registrando el resu
 - [x] **3.2** **Brackets clásico** *(hecho)*: eliminación simple, sin doble eliminación; tamaños potencia de 2 (4/8/16/32/64, sin byes, ya validado en el asistente 3.1). **Siembra** en dos modos: **sorteo** (barajado cripto-uniforme, re-sorteable) o **manual** (un `<select>` por hueco, sin repetidos). Genera el cuadro completo; cada **llave** se resuelve con un marcador (sin empates) y el ganador **avanza solo** a la ronda siguiente; deshacer por llave (bloqueado si la siguiente ya se jugó); "volver a sembrar" mientras no haya combates. Al decidirse la final → **"Finalizar y coronar"**. Piezas: `core/bracket.js` (puro: `construirBracket`/`barajar`/`localizarLlave`/`campeonBracket`…), store `sembrarBracket`/`resolverLlave`/`deshacerLlave`/`limpiarBracket`, `torneo/BracketVista.svelte`, dispatch en `TorneoDetalle.svelte` por `etapa.tipo`.
 - [x] **3.3** **Fase de grupos** *(hecho)*: multi-etapa real. Siembra de grupos (nº de grupos + **sorteo** o **manual** por invocador; cada grupo ≥2); cada grupo con su **mini-tabla derivada** (reusa `clasificar`) y sus combates (ELEGIR COMBATE azar inteligente o a mano; **empates permitidos**; deshacer por grupo). **"Finalizar fase de grupos"** cierra la etapa (sin coronar) y el shell ofrece **"Abrir siguiente etapa"** eligiendo tipo + quiénes pasan a mano (repechajes; bracket exige potencia de 2). Refactor a shell multi-etapa: `TorneoDetalle.svelte` = cabecera + **pestañas de etapas** + dispatch; vistas extraídas `TablaVista.svelte` / `GruposVista.svelte` / `BracketVista.svelte` (todas reciben `{torneo, etapa}`). Store: `sembrarGrupos`/`limpiarGrupos`/`finalizarEtapa`/`reabrirEtapa`/`agregarEtapa`/`borrarEtapa`, `registrarResultado` y `borrarDuelo` ahora conscientes del grupo. Banner de campeón único en el shell.
 - [ ] **3.4** **Sistema suizo** — *(futuro; por ahora solo texto, no se implementa)*.
-- [ ] **3.7** **Integración ruleta ↔ torneo** *(se completa con la Fase 1)*: cambiar cómodo entre la **ruleta** (formato aleatorio) y la pestaña **ENFRENTAMIENTO** (resultado directo). El resultado vuelve al torneo y actualiza todo.
+- [~] **3.7** **Integración ruleta ↔ torneo** — **fundido en 1.6–1.10** (mismo trabajo, ver 1.c). El gate por `reglas.resolucion` (ruleta vs ENFRENTAMIENTO) y el retorno del resultado al torneo se construyen ahí. Arrancado en 1.6/1.7 (cara ruleta ya montada en Tabla/Grupos/Bracket); se cierra al terminar 1.8–1.10.
 
 ## Fase 4 — Temporadas & Registro
 - [ ] **4.1** Modelo de **Temporada**: agrupar torneos.
@@ -245,8 +259,8 @@ Cada partido del torneo se resuelve con la ruleta (Fase 1) o registrando el resu
 
 ## 🔜 Próximo paso sugerido
 
-**Fase 0 ✅ · Fase 2 ✅ · 3.1 ✅ · 3.5 ✅ · 3.6 ✅ · 3.2 ✅ · 3.3 ✅.** Fase 3 casi cerrada (queda **3.4 suizo** = futuro, y **3.7** que se completa con la Fase 1). Según el orden de ejecución global (Fase 3 → **Fase 1**):
+**Fase 0 ✅ · Fase 2 ✅ · 3.1 ✅ · 3.5 ✅ · 3.6 ✅ · 3.2 ✅ · 3.3 ✅.** Fase 3 casi cerrada (queda **3.4 suizo** = futuro, y **3.7** que se funde en 1.6–1.10). Según el orden de ejecución global (Fase 3 → **Fase 1**):
 
-- **Fase 1 ⭐ — Sistema de Combate.** 1.1 ✅ (motor `Ruleta.svelte`), 1.2 ✅ (single/dual, dos tambores en dual), 1.3 ✅ (retratos en la revelación de ambos modos). Sigue: **1.4** panel de reglas del duelo (Bo1/3/5, mirror, champion pool, restock, etiquetas hechizos/runas), **1.5** presets, **1.6–1.10** flujo VS con marcador de 2 filas + restock + guardar duelo, y por último **3.7** (enchufar la ruleta al torneo). ← *siguiente: 1.4*
+- **Fase 1 ⭐ — Sistema de Combate.** 1.1 ✅ (motor `Ruleta.svelte`), 1.2 ✅ (single/dual), 1.3 ✅ (retratos en la revelación), 1.4 ✅ (`PanelReglas.svelte`; Mirror → single/dual), **1.6 ✅ · 1.7 ✅** (puente Fase 1↔3: `DueloRuleta.svelte` = VS con retratos + ruleta según reglas, gateada por `resolucion` en Tabla/Grupos/Bracket → **arranca 3.7**). Sigue: **1.8** marcador de 2 filas (fila 2 = campeones jugados), **1.9** restock, **1.10** guardar `games[]`. Pendiente aparte: **1.5** presets de reglas. ← *siguiente: 1.8*
 
 Tú decides el siguiente prompt; yo lo resuelvo y lo tachamos aquí.

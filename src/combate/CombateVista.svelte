@@ -5,13 +5,21 @@
   //           modo **dual** (no-mirror: 2 giros, uno por invocador). Como la
   //           `Ruleta` es "tonta" y entrega 1 resultado, en dual montamos DOS.
   //   · 1.3 → los retratos de `champs/` alimentan la revelación en ambos lados.
-  // Nota: aquí ambas ruletas sortean sobre los 173 (champion pool llega en 1.4).
-  // El flujo VS real (invocadores + reglas heredadas + marcador) llega en 1.6+.
+  //   · 1.4 → panel de reglas compartido `PanelReglas`; el Mirror del panel manda
+  //           el modo single/dual (antes era un selector segmentado hardcodeado).
+  // Nota: aquí ambas ruletas sortean sobre los 173; champion pool y restock
+  // necesitan invocadores reales y se aplican en el flujo VS (1.7 / 1.9, Fase 1.c).
   import Ruleta from './Ruleta.svelte'
+  import PanelReglas from './PanelReglas.svelte'
   import { CHAMPION_IDS, getChampion } from '../core/champions.js'
+  import { reglasPorDefecto } from '../core/estado.svelte.js'
 
-  /** @type {'single' | 'dual'} */
-  let modo = $state('single')
+  // Reglas locales del banco de pruebas (editables en vivo con PanelReglas).
+  // Aquí la resolución siempre es "ruleta"; es el Mirror el que manda el modo.
+  let reglas = $state({ ...reglasPorDefecto(), resolucion: 'ruleta' })
+
+  /** @type {'single' | 'dual'} — mirror ON = single, mirror OFF = dual. */
+  const modo = $derived(reglas.mirror ? 'single' : 'dual')
 
   // Referencias imperativas: single usa r1; dual usa r1 (Invocador 1) y r2 (Invocador 2).
   let r1 = $state()
@@ -49,12 +57,14 @@
     if (--pendientes <= 0) girando = false
   }
 
-  function cambiarModo(/** @type {'single' | 'dual'} */ m) {
-    if (girando || m === modo) return
-    modo = m
+  // Al togglear Mirror (cambia el modo) limpiamos las revelaciones previas.
+  // `.pre` evita el parpadeo de una revelación vieja antes de recomponer la arena.
+  // El panel se deshabilita mientras gira, así que el modo nunca cambia a mitad de giro.
+  $effect.pre(() => {
+    modo // dependencia
     ganador1 = null
     ganador2 = null
-  }
+  })
 
   const etiquetaBoton = $derived(
     girando
@@ -74,34 +84,22 @@
     <p class="cab__sub">Banco de pruebas del motor de ruleta · {CHAMPION_IDS.length} campeones</p>
   </header>
 
-  <div class="modos" role="group" aria-label="Modo de sorteo">
-    <button
-      type="button"
-      class="modos__op"
-      class:activo={modo === 'single'}
-      onclick={() => cambiarModo('single')}
-      disabled={girando}
-    >
-      <span class="modos__t">Single</span>
-      <span class="modos__d">espejo · 1 campeón</span>
-    </button>
-    <button
-      type="button"
-      class="modos__op"
-      class:activo={modo === 'dual'}
-      onclick={() => cambiarModo('dual')}
-      disabled={girando}
-    >
-      <span class="modos__t">Dual</span>
-      <span class="modos__d">uno por invocador</span>
-    </button>
-  </div>
+  <PanelReglas
+    bind:reglas
+    leyenda="Reglas del duelo (banco de pruebas)"
+    mostrarResolucion={false}
+    mostrarPuntos={false}
+    deshabilitado={girando}
+  />
   <p class="modos__nota">
     {#if modo === 'single'}
-      Un solo giro: <strong>ambos invocadores</strong> juegan el mismo campeón (mirror match).
+      <strong>Mirror ON → Single:</strong> un solo giro; ambos invocadores juegan el mismo campeón.
     {:else}
-      Dos giros simultáneos: <strong>cada invocador</strong> recibe su propio campeón.
+      <strong>Mirror OFF → Dual:</strong> dos giros simultáneos; cada invocador recibe su propio campeón.
     {/if}
+  </p>
+  <p class="nota-alcance">
+    Champion pool y Restock necesitan invocadores reales — se aplican en el flujo VS (1.7 / 1.9).
   </p>
 
   <div class="acciones">
@@ -179,62 +177,21 @@
     color: var(--humo);
   }
 
-  /* Selector de modo (segmentado) — 1.2 */
-  .modos {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.6rem;
-    max-width: 30rem;
-    margin: 0 auto;
-    width: 100%;
-  }
-  .modos__op {
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
-    padding: 0.7rem 1rem;
-    background: linear-gradient(180deg, rgba(18, 37, 60, 0.5), rgba(7, 11, 18, 0.6));
-    border: 1px solid rgba(200, 170, 110, 0.22);
-    border-radius: 3px;
-    cursor: pointer;
-    color: var(--humo);
-    transition: border-color 0.2s, color 0.2s, background 0.2s, transform 0.15s;
-  }
-  .modos__op:hover:not(:disabled):not(.activo) {
-    border-color: rgba(200, 170, 110, 0.45);
-    transform: translateY(-1px);
-  }
-  .modos__op.activo {
-    border-color: var(--borde-oro-fuerte);
-    color: var(--oro-claro);
-    background: radial-gradient(120% 120% at 50% 0%, rgba(10, 200, 185, 0.12), transparent 60%),
-      linear-gradient(180deg, rgba(18, 37, 60, 0.8), rgba(7, 11, 18, 0.7));
-    box-shadow: inset 0 0 30px -18px var(--oro);
-  }
-  .modos__op:disabled {
-    cursor: not-allowed;
-    opacity: 0.65;
-  }
-  .modos__t {
-    font-family: var(--fuente-display);
-    font-weight: 800;
-    font-size: 1.05rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-  .modos__d {
-    font-size: 0.68rem;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-  }
   .modos__nota {
-    margin: -0.8rem 0 0;
+    margin: 0;
     text-align: center;
     font-size: 0.82rem;
     color: var(--humo);
   }
   .modos__nota strong {
     color: var(--oro-claro);
+  }
+  .nota-alcance {
+    margin: -0.9rem 0 0;
+    text-align: center;
+    font-size: 0.74rem;
+    letter-spacing: 0.04em;
+    color: rgba(122, 138, 160, 0.7);
   }
 
   .acciones {
