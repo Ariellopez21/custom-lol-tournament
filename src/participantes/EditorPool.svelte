@@ -2,6 +2,7 @@
   // Fase 2.2 — Editor de Champion Pool de un participante.
   // Modal: rejilla de los 173 retratos con buscador; selección por lotes con
   // Guardar/Cancelar. Convención del modelo: pool vacío = "todos los 173".
+  import { untrack } from 'svelte'
   import { CHAMPIONS } from '../core/champions.js'
   import { definirPool } from '../core/estado.svelte.js'
 
@@ -10,10 +11,13 @@
   const TOTAL = CHAMPIONS.length
 
   // Set de trabajo. Si el pool guardado está vacío, arrancamos con "todos".
-  const desdeGuardado =
+  // `untrack`: queremos la foto INICIAL del pool al abrir el modal, no re-derivar
+  // si `participante` cambiara (mismo patrón que la siembra inicial del bracket).
+  const desdeGuardado = untrack(() =>
     participante.championPool.length === 0
       ? new Set(CHAMPIONS.map((c) => c.id))
       : new Set(participante.championPool)
+  )
 
   let seleccion = $state(desdeGuardado)
   let busqueda = $state('')
@@ -42,13 +46,19 @@
 
 <svelte:window onkeydown={(e) => e.key === 'Escape' && onCerrar()} />
 
-<div class="fondo" role="presentation" onclick={onCerrar}>
+<!-- Clic en el fondo (no en el panel) cierra: comparamos target === currentTarget
+     en vez de stopPropagation en el panel, así el panel no necesita onclick. -->
+<div
+  class="fondo"
+  role="presentation"
+  onclick={(e) => e.target === e.currentTarget && onCerrar()}
+>
   <div
     class="panel"
     role="dialog"
     aria-modal="true"
+    tabindex="-1"
     aria-label={`Champion pool de ${participante.nombre}`}
-    onclick={(e) => e.stopPropagation()}
   >
     <header class="panel__cab">
       <div class="panel__titulos">

@@ -123,6 +123,11 @@
     position: relative;
     display: grid;
     place-items: center;
+    /* Ancho propio: sin esto, si el padre la centra (align-items:center) en vez
+       de estirarla, `.ruleta` se encoge a su contenido y el `100%` del tambor
+       colapsa a 0 → ruleta invisible. Con width:100% funciona en cualquier
+       contenedor (columna centrada del modo dual incluida). */
+    width: 100%;
     /* Decorativa (aria-hidden): el aro se desborda hacia arriba y no debe
        robarle los clics al botón que la precede. */
     pointer-events: none;
@@ -130,7 +135,9 @@
   .aro {
     position: absolute;
     z-index: 0;
-    width: min(520px, 96vw);
+    /* Relativo al contenedor (no al viewport) para poder montar dos ruletas en
+       columnas —modo dual, 1.2— sin que el aro desborde y provoque scroll. */
+    width: min(520px, 100%);
     aspect-ratio: 1;
     border: 1px solid rgba(200, 170, 110, 0.16);
     border-radius: 50%;

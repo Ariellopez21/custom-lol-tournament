@@ -175,8 +175,8 @@ La joya. Un duelo 1v1 ARAM configurable, resuelto con una ruleta teatral.
 
 ### 1.a — Motor de ruleta reutilizable
 - [x] **1.1** Portar el tambor de `ruleta-espejo.html` a un componente `Ruleta.svelte` que gira sobre una **lista** y aterriza en el ganador. **Solo campeones** (list-driven por dentro para soportar el modo dual). *(Hecho: `src/combate/Ruleta.svelte`, reutilizable — props `items`/`duracionMs`/`alto`/`onresultado`; API imperativa `girar(ganadorId?)`/`estaGirando()` vía `bind:this`; azar cripto uniforme; cinta de 58 ranuras + ganador centrado; retratos mini en cada ranura; respeta `prefers-reduced-motion`. Banco de pruebas en `CombateVista.svelte` con revelación del elegido.)*
-- [ ] **1.2** Modo **single** (mirror: 1 resultado, ambos lo juegan) y modo **dual** (no-mirror: 2 resultados, uno por invocador).
-- [ ] **1.3** Conectar los retratos de `champs/` a la revelación (ya está el hueco `#retrato` en el prototipo).
+- [x] **1.2** Modo **single** (mirror: 1 resultado, ambos lo juegan) y modo **dual** (no-mirror: 2 resultados, uno por invocador). *(Hecho: como la `Ruleta` entrega 1 ganador, en **dual** se montan **dos** instancias —una por invocador— con giro simultáneo; `CombateVista` trae un selector segmentado single/dual, botón que gira 1 o 2 tambores y contador `pendientes` para saber cuándo aterrizaron ambos. Ajuste en `Ruleta.svelte`: el aro pasa a `min(520px, 100%)` para caber en columnas sin desbordar.)*
+- [x] **1.3** Conectar los retratos de `champs/` a la revelación (ya está el hueco `#retrato` en el prototipo). *(Hecho: revelación con retrato en **ambos** modos y **por lado** en dual, vía un `{#snippet revelacion}` reutilizable con variante compacta; los retratos ya salían en cada ranura del tambor desde 1.1.)*
 
 ### 1.b — Configuración de reglas
 - [ ] **1.4** Panel de reglas del duelo (en torneo, se **heredan** del torneo — Fase 3):
@@ -247,6 +247,6 @@ Cada partido del torneo se resuelve con la ruleta (Fase 1) o registrando el resu
 
 **Fase 0 ✅ · Fase 2 ✅ · 3.1 ✅ · 3.5 ✅ · 3.6 ✅ · 3.2 ✅ · 3.3 ✅.** Fase 3 casi cerrada (queda **3.4 suizo** = futuro, y **3.7** que se completa con la Fase 1). Según el orden de ejecución global (Fase 3 → **Fase 1**):
 
-- **Fase 1 ⭐ — Sistema de Combate.** 1.1 ✅ (motor `Ruleta.svelte` + banco de pruebas en Combate). Sigue: **1.2** modos single (mirror) / dual (no-mirror), **1.3** retratos en la revelación, **1.4** panel de reglas, **1.6–1.10** flujo VS con marcador de 2 filas + restock + guardar duelo, y por último **3.7** (enchufar la ruleta al torneo). ← *siguiente: 1.2*
+- **Fase 1 ⭐ — Sistema de Combate.** 1.1 ✅ (motor `Ruleta.svelte`), 1.2 ✅ (single/dual, dos tambores en dual), 1.3 ✅ (retratos en la revelación de ambos modos). Sigue: **1.4** panel de reglas del duelo (Bo1/3/5, mirror, champion pool, restock, etiquetas hechizos/runas), **1.5** presets, **1.6–1.10** flujo VS con marcador de 2 filas + restock + guardar duelo, y por último **3.7** (enchufar la ruleta al torneo). ← *siguiente: 1.4*
 
 Tú decides el siguiente prompt; yo lo resuelvo y lo tachamos aquí.
