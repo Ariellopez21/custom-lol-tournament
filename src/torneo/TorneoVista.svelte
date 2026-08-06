@@ -72,7 +72,9 @@
 </script>
 
 {#if abierto}
-  <TorneoDetalle torneo={abierto} />
+  {#key abierto.id}
+    <TorneoDetalle torneo={abierto} />
+  {/key}
 {:else}
 <section class="torneos">
   <header class="cab">
