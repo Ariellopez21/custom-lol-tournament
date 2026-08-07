@@ -13,6 +13,7 @@
   import { clasificar, cambiosDeLiderato, nemesis, elegirCombatePar } from '../core/clasificacion.js'
   import DueloRuleta from '../combate/DueloRuleta.svelte'
   import ModalCombate from '../combate/ModalCombate.svelte'
+  import Marcador from '../combate/Marcador.svelte'
 
   let { torneo, etapa } = $props()
 
@@ -59,39 +60,43 @@
   // Cara del combate: ruleta (teatral, hereda campeones) o manual (ENFRENTAMIENTO).
   const esRuleta = $derived(torneo.reglas.resolucion === 'ruleta')
   /** @type {{ a: string, b: string } | null} */
-  let sorteados = $state(null) // campeones que sorteó la ruleta (1.7); se persisten en 1.10
+  let sorteados = $state(null) // último par sorteado por la ruleta (1.7); se persiste en 1.10
+  // Fila 2 del marcador (1.8): campeones jugados por cada lado. Alimentan el
+  // restock (1.9). Transitorios por combate (persistir en games[] = 1.10).
+  /** @type {string[]} */ let jugadosA = $state([])
+  /** @type {string[]} */ let jugadosB = $state([])
 
   const puedeRegistrar = $derived(combate && (ga > 0 || gb > 0))
 
   const nombreDe = (/** @type {string} */ id) =>
     estado.participantes.find((p) => p.id === id)?.nombre ?? '—'
 
+  function reset() {
+    ga = 0
+    gb = 0
+    sorteados = null
+    jugadosA = []
+    jugadosB = []
+  }
   function elegir() {
     const par = elegirCombatePar(etapa.participantes, duelos)
     if (par) {
       combate = par
-      ga = 0
-      gb = 0
       manual = false
-      sorteados = null
+      reset()
     }
   }
   function cargarManual() {
     if (selA && selB && selA !== selB) {
       combate = { a: selA, b: selB }
-      ga = 0
-      gb = 0
       manual = false
-      sorteados = null
+      reset()
     }
   }
   function cancelar() {
     combate = null
-    ga = 0
-    gb = 0
-    sorteados = null
+    reset()
   }
-  const clamp = (/** @type {number} */ n) => Math.max(0, Math.min(maxLados, n))
 
   function mostrarEvento(/** @type {string} */ texto, /** @type {string} */ tono) {
     evento = { texto, tono }
@@ -151,26 +156,6 @@
 </script>
 
 <div class="etapa-body">
-  {#snippet marca()}
-    <div class="vs__centro">
-      <div class="marcador">
-        <div class="lado-marca">
-          <button class="paso" type="button" onclick={() => (ga = clamp(ga - 1))} aria-label="Menos games a {nombreDe(combate?.a)}">–</button>
-          <span class="paso__n">{ga}</span>
-          <button class="paso" type="button" onclick={() => (ga = clamp(ga + 1))} aria-label="Más games a {nombreDe(combate?.a)}">+</button>
-        </div>
-        <span class="paso__vs">:</span>
-        <div class="lado-marca">
-          <button class="paso" type="button" onclick={() => (gb = clamp(gb - 1))} aria-label="Menos games a {nombreDe(combate?.b)}">–</button>
-          <span class="paso__n">{gb}</span>
-          <button class="paso" type="button" onclick={() => (gb = clamp(gb + 1))} aria-label="Más games a {nombreDe(combate?.b)}">+</button>
-        </div>
-      </div>
-      <span class="marcador__hint">
-        {esRuleta ? 'marcador final · games ganados' : 'games ganados'} · máx {maxLados}
-      </span>
-    </div>
-  {/snippet}
   <p class="etapa-sub">
     {etapa?.nombre ?? 'Liga'} · {torneo.reglas.resolucion === 'ruleta' ? 'Ruleta' : 'Manual'}
     {torneo.reglas.formato} · {etapa?.participantes.length ?? 0} invocadores · {duelos.length}
@@ -202,11 +187,17 @@
         {#if esRuleta}
           <p class="en-curso">⚔️ Combate por ruleta en curso · <b>{nombreDe(combate.a)}</b> vs <b>{nombreDe(combate.b)}</b></p>
         {:else}
-          <div class="vs">
-            <span class="vs__nom vs__nom--a">{nombreDe(combate.a)}</span>
-            {@render marca()}
-            <span class="vs__nom vs__nom--b">{nombreDe(combate.b)}</span>
-          </div>
+          <Marcador
+            a={combate.a}
+            b={combate.b}
+            bind:ga
+            bind:gb
+            bind:jugadosA
+            bind:jugadosB
+            {maxLados}
+            permitirAnadir
+            hint="games ganados · campeones jugados (fila 2) · máx {maxLados}"
+          />
           <div class="combate__acc">
             <button class="boton" type="button" onclick={registrar} disabled={!puedeRegistrar}>Registrar resultado</button>
             <button class="mini" type="button" onclick={elegir}>↻ Otro</button>
@@ -238,8 +229,26 @@
     <!-- Cara ruleta: modal/overlay "Pantalla VS" (1.6). -->
     {#if esRuleta && combate}
       <ModalCombate onCerrar={cancelar} titulo={etapa?.nombre ?? 'Liga'}>
-        <DueloRuleta a={combate.a} b={combate.b} reglas={torneo.reglas} onsorteo={(c) => (sorteados = c)} />
-        {@render marca()}
+        <Marcador
+          a={combate.a}
+          b={combate.b}
+          bind:ga
+          bind:gb
+          bind:jugadosA
+          bind:jugadosB
+          {maxLados}
+          hint="marcador final · máx {maxLados} · la fila 2 la anota la ruleta"
+        />
+        <DueloRuleta
+          a={combate.a}
+          b={combate.b}
+          reglas={torneo.reglas}
+          {maxLados}
+          mostrarCabecera={false}
+          bind:jugadosA
+          bind:jugadosB
+          onsorteo={(c) => (sorteados = c)}
+        />
         <div class="combate__acc">
           <button class="boton" type="button" onclick={registrar} disabled={!puedeRegistrar}>Registrar resultado</button>
           <button class="mini" type="button" onclick={elegir}>↻ Otro combate</button>
@@ -493,77 +502,6 @@
     font-size: 0.9rem;
   }
 
-  /* VS activo */
-  .vs {
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    align-items: center;
-    gap: clamp(0.5rem, 2vw, 1.5rem);
-    width: 100%;
-  }
-  .vs__nom {
-    font-family: var(--fuente-display);
-    font-weight: 700;
-    font-size: clamp(1rem, 2.6vw, 1.5rem);
-    color: var(--oro-claro);
-    overflow-wrap: anywhere;
-  }
-  .vs__nom--a {
-    text-align: right;
-  }
-  .vs__nom--b {
-    text-align: left;
-  }
-  .vs__centro {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.4rem;
-  }
-  .marcador {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-  .paso {
-    width: 34px;
-    height: 34px;
-    border-radius: 50%;
-    border: 1px solid var(--borde-oro);
-    background: transparent;
-    color: var(--oro);
-    font-size: 1.2rem;
-    cursor: pointer;
-    transition: border-color 0.15s, color 0.15s;
-  }
-  .paso:hover {
-    color: var(--oro-claro);
-    border-color: var(--borde-oro-fuerte);
-  }
-  .paso__n {
-    font-family: var(--fuente-display);
-    font-weight: 900;
-    font-size: 1.8rem;
-    color: var(--oro-claro);
-    min-width: 1.4ch;
-    text-align: center;
-  }
-  .paso__vs {
-    color: var(--sangre);
-    font-family: var(--fuente-display);
-    font-weight: 800;
-  }
-  .lado-marca {
-    display: flex;
-    align-items: center;
-    gap: 0.35rem;
-  }
-  .marcador__hint {
-    font-size: 0.62rem;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--humo);
-  }
   .combate__acc {
     display: flex;
     flex-wrap: wrap;

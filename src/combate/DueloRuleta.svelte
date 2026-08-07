@@ -12,7 +12,13 @@
   //                                        (pool vacío en alguno ⇒ los 173).
   //   · championPool = true + dual      → 2 ruletas, cada una sobre el pool PROPIO
   //                                        del invocador (vacío ⇒ los 173).
-  // Restock (excluir campeones ya jugados) llega en 1.9; aquí aún no filtra.
+  //
+  // 1.8 — tras cada giro, el botón «✓ Anotar» empuja el/los campeón(es) a la fila 2
+  //       del marcador (bind:jugadosA/B, compartido con `Marcador.svelte`).
+  // 1.9 — restock: si `reglas.restock === false`, la ruleta EXCLUYE los campeones
+  //       ya jugados (los de la fila 2). En mirror excluye la unión; en dual, el
+  //       pool propio de cada uno. Si al excluir se vacía el pool, no se vacía la
+  //       ruleta (se permite repetir) para no bloquear en pools pequeños.
   import Ruleta from './Ruleta.svelte'
   import { estado } from '../core/estado.svelte.js'
   import { CHAMPION_IDS, getChampion } from '../core/champions.js'
@@ -21,6 +27,10 @@
     a,
     b,
     reglas,
+    jugadosA = $bindable([]),
+    jugadosB = $bindable([]),
+    maxLados = 1,
+    mostrarCabecera = true,
     /** @type {(campeones: { a: string, b: string }) => void} */
     onsorteo = () => {},
     deshabilitado = false,
@@ -41,18 +51,38 @@
     return p && p.length ? p : CHAMPION_IDS
   }
 
-  // Lista de la ruleta en SINGLE (mirror): unión de ambos pools; si alguno no
+  // 1.9 — Restock: si está OFF, quita de `lista` los ya jugados; si eso la vacía
+  // (pool agotado), se devuelve la lista original para no bloquear el giro.
+  const conRestock = (/** @type {string[]} */ lista, /** @type {string[]} */ jugados) => {
+    if (reglas?.restock) return lista // restock ON: se pueden repetir
+    const fuera = new Set(jugados)
+    const libres = lista.filter((id) => !fuera.has(id))
+    return libres.length ? libres : lista
+  }
+
+  // Lista base de la ruleta en SINGLE (mirror): unión de ambos pools; si alguno no
   // restringe su pool (vacío) la unión da los 173.
-  const itemsMirror = $derived.by(() => {
+  const baseMirror = $derived.by(() => {
     if (!reglas?.championPool) return CHAMPION_IDS
     const pa = partA?.championPool ?? []
     const pb = partB?.championPool ?? []
     if (pa.length === 0 || pb.length === 0) return CHAMPION_IDS
     return [...new Set([...pa, ...pb])]
   })
-  const itemsA = $derived(reglas?.championPool ? poolPropio(partA) : CHAMPION_IDS)
-  const itemsB = $derived(reglas?.championPool ? poolPropio(partB) : CHAMPION_IDS)
+  const baseA = $derived(reglas?.championPool ? poolPropio(partA) : CHAMPION_IDS)
+  const baseB = $derived(reglas?.championPool ? poolPropio(partB) : CHAMPION_IDS)
+
+  // Listas efectivas ya filtradas por restock (fila 2 = jugadosA/B).
+  const itemsMirror = $derived(conRestock(baseMirror, [...jugadosA, ...jugadosB]))
+  const itemsA = $derived(conRestock(baseA, jugadosA))
+  const itemsB = $derived(conRestock(baseB, jugadosB))
   const nPool = $derived(modo === 'single' ? itemsMirror.length : null)
+
+  // Contador de games (para el rótulo del botón). Total máx. de games = 2·máx−1
+  // (p.ej. Bo3 ⇒ máx 2 lados ⇒ hasta 3 games; Bo1 ⇒ 1).
+  const maxGames = $derived(Math.max(1, 2 * maxLados - 1))
+  const gameN = $derived(Math.max(jugadosA.length, jugadosB.length) + 1)
+  const quedanGames = $derived(gameN <= maxGames)
 
   // ── Giro ─────────────────────────────────────────────
   let r1 = $state()
@@ -99,24 +129,35 @@
     finPaso()
   }
   function finPaso() {
-    if (--pendientes <= 0) {
-      girando = false
-      if (champA && champB) onsorteo({ a: champA, b: champB })
-    }
+    if (--pendientes <= 0) girando = false // el resultado espera a «Anotar»
   }
 
-  const etiquetaBoton = $derived(
-    girando ? 'Girando…' : hayResultado ? '↻ Volver a girar' : modo === 'single' ? '⚔️ Girar la ruleta' : '⚔️ Girar ambas'
+  // 1.8 — «Anotar»: fija el/los campeón(es) del game en la fila 2 y limpia la
+  // revelación, listo para el siguiente giro. En mirror, el mismo va a ambos.
+  function anotar() {
+    if (girando || !champA || !champB) return
+    jugadosA = [...jugadosA, champA]
+    jugadosB = [...jugadosB, champB]
+    onsorteo({ a: champA, b: champB })
+    champA = null
+    champB = null
+  }
+
+  const etiquetaGirar = $derived(
+    girando ? 'Girando…' : modo === 'single' ? '⚔️ Girar la ruleta' : '⚔️ Girar ambas'
   )
 </script>
 
 <div class="duelo">
-  <!-- VS (1.6): fichas de ambos invocadores -->
-  <div class="vs-cab">
-    {@render ficha(nombreA)}
-    <span class="vs-cab__x">VS</span>
-    {@render ficha(nombreB)}
-  </div>
+  <!-- VS (1.6): fichas de ambos invocadores. Se oculta si el Marcador ya muestra
+       la identidad de ambos (cara ruleta del torneo, mostrarCabecera=false). -->
+  {#if mostrarCabecera}
+    <div class="vs-cab">
+      {@render ficha(nombreA)}
+      <span class="vs-cab__x">VS</span>
+      {@render ficha(nombreB)}
+    </div>
+  {/if}
 
   <p class="duelo__meta">
     {#if modo === 'single'}
@@ -124,11 +165,21 @@
     {:else}
       Dual · un campeón por invocador{#if reglas?.championPool} · desde el pool de cada uno{/if}
     {/if}
+    {#if !reglas?.restock} · <span class="duelo__restock">sin restock</span>{/if}
+    {#if maxGames > 1} · game {Math.min(gameN, maxGames)}/{maxGames}{/if}
   </p>
 
   <div class="duelo__acc">
-    <button class="girar" type="button" onclick={girar} disabled={girando || deshabilitado}>{etiquetaBoton}</button>
+    {#if hayResultado && !girando}
+      <button class="girar" type="button" onclick={anotar} disabled={deshabilitado}>✓ Anotar {modo === 'single' ? 'campeón' : 'campeones'}</button>
+      <button class="mini" type="button" onclick={girar} disabled={deshabilitado}>↻ Repetir giro</button>
+    {:else}
+      <button class="girar" type="button" onclick={girar} disabled={girando || deshabilitado || !quedanGames}>{etiquetaGirar}</button>
+    {/if}
   </div>
+  {#if !quedanGames && !hayResultado && !girando}
+    <p class="duelo__tope">Se anotaron los {maxGames} games. Quita alguno de la fila 2 para volver a girar.</p>
+  {/if}
 
   <!-- Ruleta (1.7): single = 1 tambor · dual = 2 tambores -->
   {#if modo === 'single'}
@@ -235,10 +286,43 @@
     text-transform: uppercase;
     color: var(--humo);
   }
+  .duelo__restock {
+    color: var(--sangre);
+  }
+  .duelo__tope {
+    margin: 0;
+    text-align: center;
+    font-size: 0.7rem;
+    color: var(--humo);
+    max-width: 30rem;
+  }
 
   .duelo__acc {
     display: flex;
+    flex-wrap: wrap;
     justify-content: center;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .mini {
+    background: transparent;
+    border: 1px solid var(--borde-oro);
+    border-radius: 2px;
+    color: var(--humo);
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 0.5rem 0.85rem;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .mini:hover:not(:disabled) {
+    color: var(--oro-claro);
+    border-color: var(--borde-oro-fuerte);
+  }
+  .mini:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
   }
   .girar {
     font-family: var(--fuente-display);

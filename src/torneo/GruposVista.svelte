@@ -17,6 +17,7 @@
   import { barajar } from '../core/bracket.js'
   import DueloRuleta from '../combate/DueloRuleta.svelte'
   import ModalCombate from '../combate/ModalCombate.svelte'
+  import Marcador from '../combate/Marcador.svelte'
 
   let { torneo, etapa } = $props()
 
@@ -87,39 +88,42 @@
   // Cara del combate: ruleta (teatral) o manual (ENFRENTAMIENTO).
   const esRuleta = $derived(torneo.reglas.resolucion === 'ruleta')
   /** @type {{ a: string, b: string } | null} */
-  let sorteados = $state(null) // campeones sorteados por la ruleta (1.7); persisten en 1.10
+  let sorteados = $state(null) // último par sorteado por la ruleta (1.7); persiste en 1.10
+  // Fila 2 del marcador (1.8): campeones jugados; alimentan el restock (1.9).
+  /** @type {string[]} */ let jugadosA = $state([])
+  /** @type {string[]} */ let jugadosB = $state([])
   // Grupo del combate en curso (para el modal de ruleta a nivel de vista).
   const grupoActivo = $derived(combate ? grupos.find((g) => g.id === combate.grupoId) ?? null : null)
 
-  const clamp = (/** @type {number} */ n) => Math.max(0, Math.min(maxLados, n))
   const puedeRegistrar = $derived(combate && (ga > 0 || gb > 0))
 
+  function reset() {
+    ga = 0
+    gb = 0
+    sorteados = null
+    jugadosA = []
+    jugadosB = []
+  }
   function elegir(/** @type {any} */ grupo) {
     const par = elegirCombatePar(grupo.participantes, duelosDeGrupo(grupo))
     if (par) {
       combate = { grupoId: grupo.id, a: par.a, b: par.b }
-      ga = 0
-      gb = 0
       manualEn = null
-      sorteados = null
+      reset()
     }
   }
   function cargarManual(/** @type {any} */ grupo) {
     if (selA && selB && selA !== selB) {
       combate = { grupoId: grupo.id, a: selA, b: selB }
-      ga = 0
-      gb = 0
       manualEn = null
       selA = ''
       selB = ''
-      sorteados = null
+      reset()
     }
   }
   function cancelar() {
     combate = null
-    ga = 0
-    gb = 0
-    sorteados = null
+    reset()
   }
   function registrar() {
     if (!combate || (ga === 0 && gb === 0)) return
@@ -134,20 +138,6 @@
 </script>
 
 <div class="etapa-body">
-  {#snippet marca()}
-    <div class="vs__centro">
-      <div class="marcador">
-        <button class="paso" type="button" onclick={() => (ga = clamp(ga - 1))} aria-label="menos A">–</button>
-        <span class="paso__n">{ga}</span>
-        <button class="paso" type="button" onclick={() => (ga = clamp(ga + 1))} aria-label="más A">+</button>
-        <span class="paso__sep">:</span>
-        <button class="paso" type="button" onclick={() => (gb = clamp(gb - 1))} aria-label="menos B">–</button>
-        <span class="paso__n">{gb}</span>
-        <button class="paso" type="button" onclick={() => (gb = clamp(gb + 1))} aria-label="más B">+</button>
-      </div>
-      <span class="marcador__hint">{esRuleta ? 'marcador final · ' : ''}máx {maxLados} · empate permitido</span>
-    </div>
-  {/snippet}
   <p class="etapa-sub">
     {etapa?.nombre ?? 'Fase de grupos'} · {torneo.reglas.resolucion === 'ruleta' ? 'Ruleta' : 'Manual'}
     {torneo.reglas.formato} · {N} invocadores · {grupos.length}
@@ -262,11 +252,18 @@
               {#if esRuleta}
                 <p class="en-curso">⚔️ Combate por ruleta en curso…</p>
               {:else}
-                <div class="vs">
-                  <span class="vs__nom">{nombreDe(combate.a)}</span>
-                  {@render marca()}
-                  <span class="vs__nom">{nombreDe(combate.b)}</span>
-                </div>
+                <Marcador
+                  a={combate.a}
+                  b={combate.b}
+                  bind:ga
+                  bind:gb
+                  bind:jugadosA
+                  bind:jugadosB
+                  {maxLados}
+                  permitirAnadir
+                  compacto
+                  hint="games · campeones jugados (fila 2) · máx {maxLados} · empate permitido"
+                />
                 <div class="grupo__acc">
                   <button class="boton boton--sm" type="button" onclick={registrar} disabled={!puedeRegistrar}>Registrar</button>
                   <button class="mini" type="button" onclick={() => elegir(grupo)}>↻ Otro</button>
@@ -304,8 +301,26 @@
     <!-- Cara ruleta: modal/overlay "Pantalla VS" (1.6). -->
     {#if esRuleta && combate && grupoActivo}
       <ModalCombate onCerrar={cancelar} titulo={grupoActivo.nombre}>
-        <DueloRuleta a={combate.a} b={combate.b} reglas={torneo.reglas} onsorteo={(c) => (sorteados = c)} />
-        {@render marca()}
+        <Marcador
+          a={combate.a}
+          b={combate.b}
+          bind:ga
+          bind:gb
+          bind:jugadosA
+          bind:jugadosB
+          {maxLados}
+          hint="marcador final · máx {maxLados} · empate permitido · la fila 2 la anota la ruleta"
+        />
+        <DueloRuleta
+          a={combate.a}
+          b={combate.b}
+          reglas={torneo.reglas}
+          {maxLados}
+          mostrarCabecera={false}
+          bind:jugadosA
+          bind:jugadosB
+          onsorteo={(c) => (sorteados = c)}
+        />
         <div class="grupo__acc">
           <button class="boton boton--sm" type="button" onclick={registrar} disabled={!puedeRegistrar}>Registrar</button>
           <button class="mini" type="button" onclick={() => elegir(grupoActivo)}>↻ Otro</button>
@@ -589,67 +604,6 @@
     color: var(--oro-claro);
     padding: 0.35rem 0.45rem;
     font-size: 0.85rem;
-  }
-
-  /* VS activo dentro del grupo */
-  .vs {
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    align-items: center;
-    gap: 0.5rem;
-  }
-  .vs__nom {
-    font-family: var(--fuente-display);
-    font-weight: 700;
-    font-size: 0.95rem;
-    color: var(--oro-claro);
-    text-align: center;
-    overflow-wrap: anywhere;
-  }
-  .vs__centro {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.3rem;
-  }
-  .marcador {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-  }
-  .paso {
-    width: 26px;
-    height: 26px;
-    border-radius: 50%;
-    border: 1px solid var(--borde-oro);
-    background: transparent;
-    color: var(--oro);
-    font-size: 1rem;
-    line-height: 1;
-    cursor: pointer;
-  }
-  .paso:hover {
-    color: var(--oro-claro);
-    border-color: var(--borde-oro-fuerte);
-  }
-  .paso__n {
-    font-family: var(--fuente-display);
-    font-weight: 900;
-    font-size: 1.2rem;
-    color: var(--oro-claro);
-    min-width: 1.2ch;
-    text-align: center;
-  }
-  .paso__sep {
-    color: var(--sangre);
-    font-weight: 800;
-    margin: 0 0.15rem;
-  }
-  .marcador__hint {
-    font-size: 0.58rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--humo);
   }
 
   .pie-acc {

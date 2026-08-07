@@ -15,6 +15,7 @@
   import { barajar, estaSembrado, campeonBracket, localizarLlave } from '../core/bracket.js'
   import DueloRuleta from '../combate/DueloRuleta.svelte'
   import ModalCombate from '../combate/ModalCombate.svelte'
+  import Marcador from '../combate/Marcador.svelte'
 
   let { torneo, etapa } = $props()
 
@@ -34,7 +35,10 @@
   // admite empates, así que registrar sigue bloqueado con ga === gb.
   const esRuleta = $derived(torneo.reglas.resolucion === 'ruleta')
   /** @type {{ a: string, b: string } | null} */
-  let sorteados = $state(null) // campeones sorteados por la ruleta (1.7); persisten en 1.10
+  let sorteados = $state(null) // último par sorteado por la ruleta (1.7); persiste en 1.10
+  // Fila 2 del marcador (1.8): campeones jugados; alimentan el restock (1.9).
+  /** @type {string[]} */ let jugadosA = $state([])
+  /** @type {string[]} */ let jugadosB = $state([])
 
   const nombreDe = (/** @type {string} */ id) =>
     estado.participantes.find((p) => p.id === id)?.nombre ?? '—'
@@ -74,8 +78,7 @@
   let activa = $state(null)
   let ga = $state(0)
   let gb = $state(0)
-  const clamp = (/** @type {number} */ n) => Math.max(0, Math.min(maxLados, n))
-  // Llave que se está jugando (para el panel de ruleta bajo el cuadro).
+  // Llave que se está jugando (el combate vive en el modal, con room para el marcador).
   const llaveActiva = $derived(activa ? localizarLlave(bracket, activa)?.llave ?? null : null)
 
   const marcaDe = (/** @type {any} */ ll) => {
@@ -85,21 +88,26 @@
   const puedeDeshacer = (/** @type {any} */ ll) =>
     !!ll.ganador && (!ll.avanzaA || !localizarLlave(bracket, ll.avanzaA)?.llave.ganador)
 
-  function abrir(/** @type {any} */ ll) {
-    activa = ll.id
+  function reset() {
     ga = 0
     gb = 0
     sorteados = null
+    jugadosA = []
+    jugadosB = []
+  }
+  function abrir(/** @type {any} */ ll) {
+    activa = ll.id
+    reset()
   }
   function cancelar() {
     activa = null
-    sorteados = null
+    reset()
   }
   function registrar(/** @type {any} */ ll) {
     if (ga === gb) return
     resolverLlave(torneo.id, etapa.id, ll.id, { a: ga, b: gb })
     activa = null
-    sorteados = null
+    reset()
   }
 
   // ── Cierre ───────────────────────────────────────────
@@ -109,21 +117,6 @@
 </script>
 
 <div class="etapa-body">
-  {#snippet editorMarca(ll)}
-    <div class="editor__fila">
-      <button class="paso" type="button" onclick={() => (ga = clamp(ga - 1))} aria-label="menos A">–</button>
-      <span class="paso__n">{ga}</span>
-      <button class="paso" type="button" onclick={() => (ga = clamp(ga + 1))} aria-label="más A">+</button>
-      <span class="paso__sep">:</span>
-      <button class="paso" type="button" onclick={() => (gb = clamp(gb - 1))} aria-label="menos B">–</button>
-      <span class="paso__n">{gb}</span>
-      <button class="paso" type="button" onclick={() => (gb = clamp(gb + 1))} aria-label="más B">+</button>
-    </div>
-    <div class="editor__acc">
-      <button class="mini mini--ok" type="button" onclick={() => registrar(ll)} disabled={ga === gb}>Registrar</button>
-      <button class="mini" type="button" onclick={cancelar}>✕</button>
-    </div>
-  {/snippet}
   <p class="etapa-sub">
     {etapa?.nombre ?? 'Eliminatoria'} · {torneo.reglas.resolucion === 'ruleta' ? 'Ruleta' : 'Manual'}
     {torneo.reglas.formato} · {N} invocadores · {jugados}/{totalPartidos} combates
@@ -199,13 +192,7 @@
                   </div>
 
                   {#if activa === ll.id}
-                    {#if esRuleta}
-                      <p class="jugando">▶ en curso</p>
-                    {:else}
-                      <div class="editor">
-                        {@render editorMarca(ll)}
-                      </div>
-                    {/if}
+                    <p class="jugando">▶ en curso</p>
                   {:else if torneo.estado !== 'finalizado' && ll.a && ll.b && !ll.ganador}
                     <button class="jugar" type="button" onclick={() => abrir(ll)}>Jugar ⚔️</button>
                   {:else if torneo.estado !== 'finalizado' && puedeDeshacer(ll)}
@@ -219,13 +206,39 @@
       </div>
     </div>
 
-    <!-- Cara ruleta: modal/overlay "Pantalla VS" (1.6). Las llaves son diminutas
-         para alojar el tambor, así que la ruleta vive en el modal. -->
-    {#if esRuleta && llaveActiva && llaveActiva.a && llaveActiva.b && !llaveActiva.ganador}
+    <!-- Combate en modal/overlay "Pantalla VS" (1.6). Las llaves son diminutas
+         para alojar el marcador de 2 filas (y el tambor), así que el combate
+         —manual o ruleta— vive en el modal. -->
+    {#if llaveActiva && llaveActiva.a && llaveActiva.b && !llaveActiva.ganador}
       <ModalCombate onCerrar={cancelar} titulo={etapa?.nombre ?? 'Eliminatoria'}>
-        <DueloRuleta a={llaveActiva.a} b={llaveActiva.b} reglas={torneo.reglas} onsorteo={(c) => (sorteados = c)} />
-        <div class="editor editor--panel">
-          {@render editorMarca(llaveActiva)}
+        <Marcador
+          a={llaveActiva.a}
+          b={llaveActiva.b}
+          bind:ga
+          bind:gb
+          bind:jugadosA
+          bind:jugadosB
+          {maxLados}
+          permitirAnadir={!esRuleta}
+          hint={esRuleta
+            ? `marcador final · sin empate · máx ${maxLados} · la fila 2 la anota la ruleta`
+            : `games ganados · campeones jugados (fila 2) · sin empate · máx ${maxLados}`}
+        />
+        {#if esRuleta}
+          <DueloRuleta
+            a={llaveActiva.a}
+            b={llaveActiva.b}
+            reglas={torneo.reglas}
+            {maxLados}
+            mostrarCabecera={false}
+            bind:jugadosA
+            bind:jugadosB
+            onsorteo={(c) => (sorteados = c)}
+          />
+        {/if}
+        <div class="modal-acc">
+          <button class="boton" type="button" onclick={() => registrar(llaveActiva)} disabled={ga === gb}>Registrar resultado</button>
+          <button class="mini" type="button" onclick={cancelar}>✕ Cancelar</button>
         </div>
       </ModalCombate>
     {/if}
@@ -468,53 +481,15 @@
     border-color: var(--borde-oro);
   }
 
-  /* Editor de marcador dentro de la llave */
-  .editor {
-    margin-top: 0.3rem;
+  /* Acciones del combate dentro del modal. */
+  .modal-acc {
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.35rem;
-  }
-  .editor__fila {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-  }
-  .paso {
-    width: 26px;
-    height: 26px;
-    border-radius: 50%;
-    border: 1px solid var(--borde-oro);
-    background: transparent;
-    color: var(--oro);
-    font-size: 1rem;
-    line-height: 1;
-    cursor: pointer;
-  }
-  .paso:hover {
-    color: var(--oro-claro);
-    border-color: var(--borde-oro-fuerte);
-  }
-  .paso__n {
-    font-family: var(--fuente-display);
-    font-weight: 900;
-    font-size: 1.2rem;
-    color: var(--oro-claro);
-    min-width: 1.2ch;
-    text-align: center;
-  }
-  .paso__sep {
-    color: var(--sangre);
-    font-weight: 800;
-    margin: 0 0.15rem;
-  }
-  .editor__acc {
-    display: flex;
-    gap: 0.35rem;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.5rem;
   }
 
-  /* Marca de "jugando" dentro de la llave (la ruleta está en el panel de abajo). */
+  /* Marca de "jugando" dentro de la llave (el combate vive en el modal de abajo). */
   .jugando {
     margin: 0.3rem 0 0;
     text-align: center;
@@ -522,11 +497,6 @@
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--arcano);
-  }
-
-  /* Marcador dentro del modal de ruleta (sin el margen del editor inline). */
-  .editor--panel {
-    margin-top: 0;
   }
 
   /* ── Pie ─────────────────────────────────────────── */
@@ -598,9 +568,5 @@
   .mini:disabled {
     opacity: 0.45;
     cursor: not-allowed;
-  }
-  .mini--ok {
-    color: var(--arcano);
-    border-color: var(--borde-arcano);
   }
 </style>
