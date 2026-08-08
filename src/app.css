@@ -25,3 +25,21 @@ body {
   font-weight: 300;
   -webkit-font-smoothing: antialiased;
 }
+
+/* ── Modo Overlay/OBS (fase 1.12) ──────────────────────────────
+   El body toma un fondo según `data-overlay` (lo pone App.svelte):
+   · transparente → OBS Browser Source respeta el alfa (overlay limpio).
+   · verde/magenta → chroma key con captura de ventana.
+   · negro → fondo sólido. */
+html[data-overlay] body {
+  background: transparent;
+}
+html[data-overlay='verde'] body {
+  background: #00b140;
+}
+html[data-overlay='magenta'] body {
+  background: #ff00ff;
+}
+html[data-overlay='negro'] body {
+  background: #000;
+}

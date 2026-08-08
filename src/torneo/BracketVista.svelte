@@ -105,7 +105,10 @@
   }
   function registrar(/** @type {any} */ ll) {
     if (ga === gb) return
-    resolverLlave(torneo.id, etapa.id, ll.id, { a: ga, b: gb })
+    resolverLlave(torneo.id, etapa.id, ll.id, { a: ga, b: gb }, {
+      a: $state.snapshot(jugadosA),
+      b: $state.snapshot(jugadosB),
+    })
     activa = null
     reset()
   }
@@ -220,6 +223,8 @@
           bind:jugadosB
           {maxLados}
           permitirAnadir={!esRuleta}
+          exportable
+          titulo={etapa?.nombre ?? 'Eliminatoria'}
           hint={esRuleta
             ? `marcador final · sin empate · máx ${maxLados} · la fila 2 la anota la ruleta`
             : `games ganados · campeones jugados (fila 2) · sin empate · máx ${maxLados}`}

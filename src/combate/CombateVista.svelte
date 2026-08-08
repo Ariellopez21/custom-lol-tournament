@@ -1,25 +1,17 @@
 <script>
-  // Fase 1 — Vista de Combate (banco de pruebas del motor de ruleta).
-  //   · 1.1 → motor `Ruleta.svelte` (gira sobre una lista, entrega 1 ganador).
-  //   · 1.2 → modo **single** (mirror: 1 giro, ambos juegan el mismo campeón) y
-  //           modo **dual** (no-mirror: 2 giros, uno por invocador). Como la
-  //           `Ruleta` es "tonta" y entrega 1 resultado, en dual montamos DOS.
-  //   · 1.3 → los retratos de `champs/` alimentan la revelación en ambos lados.
-  //   · 1.4 → panel de reglas compartido `PanelReglas`; el Mirror del panel manda
-  //           el modo single/dual (antes era un selector segmentado hardcodeado).
-  // Nota: aquí ambas ruletas sortean sobre los 173; champion pool y restock
-  // necesitan invocadores reales y se aplican en el flujo VS (1.7 / 1.9, Fase 1.c).
+  // La Ruleta — ruleta instantánea, independiente del torneo. Hazla girar para
+  // elegir entre los 173 campeones y enfrentar a 2 invocadores sin nombre. El
+  // único ajuste es el "Mirror match": ON = un solo giro que ambos comparten
+  // (single); OFF = un giro por invocador (dual). Motor: `Ruleta.svelte` (1.1),
+  // que entrega 1 ganador, por eso en dual montamos DOS instancias.
   import Ruleta from './Ruleta.svelte'
-  import PanelReglas from './PanelReglas.svelte'
   import { CHAMPION_IDS, getChampion } from '../core/champions.js'
-  import { reglasPorDefecto } from '../core/estado.svelte.js'
 
-  // Reglas locales del banco de pruebas (editables en vivo con PanelReglas).
-  // Aquí la resolución siempre es "ruleta"; es el Mirror el que manda el modo.
-  let reglas = $state({ ...reglasPorDefecto(), resolucion: 'ruleta' })
+  // Mirror ON = single (ambos juegan el mismo campeón); OFF = dual (uno cada uno).
+  let mirror = $state(true)
 
-  /** @type {'single' | 'dual'} — mirror ON = single, mirror OFF = dual. */
-  const modo = $derived(reglas.mirror ? 'single' : 'dual')
+  /** @type {'single' | 'dual'} */
+  const modo = $derived(mirror ? 'single' : 'dual')
 
   // Referencias imperativas: single usa r1; dual usa r1 (Invocador 1) y r2 (Invocador 2).
   let r1 = $state()
@@ -79,30 +71,29 @@
 
 <section class="combate">
   <header class="cab">
-    <p class="cab__marca">El foco ⭐ · Fase 1</p>
     <h1 class="cab__titulo texto-oro">La Ruleta</h1>
-    <p class="cab__sub">Banco de pruebas del motor de ruleta · {CHAMPION_IDS.length} campeones</p>
+    <p class="cab__desc">
+      Ruleta instantánea: gírala para elegir entre los {CHAMPION_IDS.length} campeones disponibles
+      y enfrentar a 2 invocadores sin nombre, que pueden competir en <strong>dual</strong> o
+      <strong>mirror match</strong>.
+    </p>
   </header>
 
-  <PanelReglas
-    bind:reglas
-    leyenda="Reglas del duelo (banco de pruebas)"
-    mostrarResolucion={false}
-    mostrarPuntos={false}
-    deshabilitado={girando}
-  />
-  <p class="modos__nota">
-    {#if modo === 'single'}
-      <strong>Mirror ON → Single:</strong> un solo giro; ambos invocadores juegan el mismo campeón.
-    {:else}
-      <strong>Mirror OFF → Dual:</strong> dos giros simultáneos; cada invocador recibe su propio campeón.
-    {/if}
-  </p>
-  <p class="nota-alcance">
-    Champion pool y Restock necesitan invocadores reales — se aplican en el flujo VS (1.7 / 1.9).
-  </p>
+  <div class="controles">
+    <button
+      class="mirror"
+      type="button"
+      role="switch"
+      aria-checked={mirror}
+      onclick={() => (mirror = !mirror)}
+      disabled={girando}
+      title="Mirror match: ambos invocadores comparten un mismo giro (single). Apágalo para un giro por invocador (dual)."
+    >
+      <span class="mirror__sw" aria-hidden="true"><span class="mirror__knob"></span></span>
+      <span class="mirror__txt">Mirror match</span>
+      <span class="mirror__estado">{mirror ? 'Single' : 'Dual'}</span>
+    </button>
 
-  <div class="acciones">
     <button class="boton" type="button" onclick={girar} disabled={girando}>{etiquetaBoton}</button>
   </div>
 
@@ -155,13 +146,6 @@
   .cab {
     text-align: center;
   }
-  .cab__marca {
-    margin: 0 0 0.6rem;
-    font-size: 11px;
-    letter-spacing: 0.4em;
-    text-transform: uppercase;
-    color: var(--arcano);
-  }
   .cab__titulo {
     margin: 0;
     font-family: var(--fuente-display);
@@ -169,34 +153,90 @@
     font-size: clamp(2rem, 6vw, 3.2rem);
     line-height: 1;
   }
-  .cab__sub {
-    margin: 0.8rem 0 0;
-    font-size: 0.78rem;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
+  .cab__desc {
+    margin: 0.9rem auto 0;
+    max-width: 34rem;
+    font-size: 0.95rem;
+    line-height: 1.5;
     color: var(--humo);
   }
-
-  .modos__nota {
-    margin: 0;
-    text-align: center;
-    font-size: 0.82rem;
-    color: var(--humo);
-  }
-  .modos__nota strong {
+  .cab__desc strong {
     color: var(--oro-claro);
-  }
-  .nota-alcance {
-    margin: -0.9rem 0 0;
-    text-align: center;
-    font-size: 0.74rem;
-    letter-spacing: 0.04em;
-    color: rgba(122, 138, 160, 0.7);
+    font-weight: 600;
   }
 
-  .acciones {
+  /* Controles: toggle Mirror + botón de girar, centrados. */
+  .controles {
     display: flex;
+    flex-wrap: wrap;
+    align-items: center;
     justify-content: center;
+    gap: 1rem 1.2rem;
+  }
+
+  .mirror {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.5rem 0.9rem 0.5rem 0.6rem;
+    border: 1px solid var(--borde-oro);
+    border-radius: 999px;
+    background: rgba(7, 11, 18, 0.5);
+    color: var(--oro-claro);
+    font-family: var(--fuente-display);
+    font-weight: 700;
+    font-size: 0.82rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .mirror:hover:not(:disabled) {
+    border-color: var(--borde-oro-fuerte);
+    background: rgba(200, 170, 110, 0.08);
+  }
+  .mirror:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+  .mirror:focus-visible {
+    outline: 2px solid var(--arcano);
+    outline-offset: 2px;
+  }
+  .mirror__sw {
+    position: relative;
+    flex: none;
+    width: 44px;
+    height: 24px;
+    border-radius: 999px;
+    border: 1px solid var(--borde-oro-tenue);
+    background: rgba(7, 11, 18, 0.8);
+    transition: background 0.2s, border-color 0.2s;
+  }
+  .mirror__knob {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--humo);
+    transition: transform 0.2s cubic-bezier(0.2, 0.9, 0.2, 1), background 0.2s;
+  }
+  .mirror[aria-checked='true'] .mirror__sw {
+    background: rgba(200, 170, 110, 0.28);
+    border-color: var(--borde-oro-fuerte);
+  }
+  .mirror[aria-checked='true'] .mirror__knob {
+    transform: translateX(20px);
+    background: var(--oro);
+  }
+  .mirror__estado {
+    padding: 0.12rem 0.5rem;
+    border-radius: 999px;
+    border: 1px solid var(--borde-oro-tenue);
+    font-size: 0.7rem;
+    color: var(--arcano);
   }
   .boton {
     font-family: var(--fuente-display);

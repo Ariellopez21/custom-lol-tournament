@@ -107,7 +107,10 @@
   function registrar() {
     if (!combate || (ga === 0 && gb === 0)) return
     const { a, b } = combate
-    registrarResultado(torneo.id, etapa.id, a, b, { a: ga, b: gb })
+    registrarResultado(torneo.id, etapa.id, a, b, { a: ga, b: gb }, null, {
+      a: $state.snapshot(jugadosA),
+      b: $state.snapshot(jugadosB),
+    })
 
     // Mensaje festivo, calculado de la clasificación ya actualizada.
     const dNow = estado.duelos.filter((d) => d.etapaId === etapa.id && d.estado === 'terminado')
@@ -196,6 +199,8 @@
             bind:jugadosB
             {maxLados}
             permitirAnadir
+            exportable
+            titulo={etapa?.nombre ?? 'Liga'}
             hint="games ganados · campeones jugados (fila 2) · máx {maxLados}"
           />
           <div class="combate__acc">
@@ -237,6 +242,8 @@
           bind:jugadosA
           bind:jugadosB
           {maxLados}
+          exportable
+          titulo={etapa?.nombre ?? 'Liga'}
           hint="marcador final · máx {maxLados} · la fila 2 la anota la ruleta"
         />
         <DueloRuleta

@@ -6,6 +6,9 @@
   // esa lógica (empates, "Otro", etc.) es propia de cada sistema de torneo.
   // Sigue el mismo patrón de modal que `EditorPool.svelte` (cierre por fondo y
   // por Escape, `role="dialog"`), para hablar el mismo lenguaje visual.
+  import { portal } from '../ui/portal.js'
+  import { overlay, entrarOverlay } from '../ui/overlay.svelte.js'
+
   let {
     onCerrar = () => {},
     titulo = 'Combate',
@@ -14,17 +17,29 @@
   } = $props()
 </script>
 
-<svelte:window onkeydown={(e) => e.key === 'Escape' && onCerrar()} />
+<!-- En overlay, Escape NO cierra el combate (lo maneja OverlayControl → salir). -->
+<svelte:window onkeydown={(e) => e.key === 'Escape' && !overlay.activo && onCerrar()} />
 
-<!-- Clic en el fondo (no en el panel) cierra: comparamos target === currentTarget. -->
-<div class="fondo" role="presentation" onclick={(e) => e.target === e.currentTarget && onCerrar()}>
-  <div class="panel" role="dialog" aria-modal="true" tabindex="-1" aria-label={`${subtitulo} · ${titulo}`}>
+<!-- Clic en el fondo (no en el panel) cierra, salvo en overlay (evita cierres
+     accidentales al operar en stream). `use:portal` lo reubica en <body> para
+     que el modo overlay pueda ocultar el contenido sin ocultar el modal. -->
+<div
+  class="fondo"
+  class:fondo--overlay={overlay.activo}
+  role="presentation"
+  use:portal
+  onclick={(e) => e.target === e.currentTarget && !overlay.activo && onCerrar()}
+>
+  <div class="panel" class:panel--overlay={overlay.activo} role="dialog" aria-modal="true" tabindex="-1" aria-label={`${subtitulo} · ${titulo}`}>
     <header class="panel__cab">
       <div class="panel__titulos">
         <p class="panel__marca">{subtitulo}</p>
         <h2 class="panel__nombre texto-oro">{titulo}</h2>
       </div>
-      <button class="cerrar" type="button" onclick={onCerrar} aria-label="Cerrar">✕</button>
+      <div class="panel__acc">
+        <button class="overlay-btn" type="button" onclick={() => entrarOverlay()} title="Modo Overlay/OBS (fondo transparente para stream)" aria-label="Activar modo Overlay/OBS">🖥️</button>
+        <button class="cerrar" type="button" onclick={onCerrar} aria-label="Cerrar">✕</button>
+      </div>
     </header>
     <div class="panel__cuerpo">
       {@render children?.()}
@@ -99,6 +114,12 @@
     font-size: clamp(1.2rem, 3.5vw, 1.8rem);
     line-height: 1;
   }
+  .panel__acc {
+    flex-shrink: 0;
+    display: flex;
+    gap: 0.4rem;
+  }
+  .overlay-btn,
   .cerrar {
     flex-shrink: 0;
     width: 34px;
@@ -113,13 +134,35 @@
     cursor: pointer;
     transition: color 0.15s, border-color 0.15s;
   }
+  .overlay-btn:hover,
   .cerrar:hover {
     color: var(--oro-claro);
     border-color: var(--borde-oro-fuerte);
   }
+  .overlay-btn:focus-visible,
   .cerrar:focus-visible {
     outline: 2px solid var(--arcano);
     outline-offset: 2px;
+  }
+
+  /* ── Modo Overlay/OBS (1.12): el panel se vuelve transparente y sin cromo,
+     dejando solo el combate (ruleta + marcador) sobre el fondo del <body>. ── */
+  .fondo--overlay {
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    animation: none;
+    padding: clamp(1rem, 4vw, 3rem);
+  }
+  .panel--overlay {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    animation: none;
+    max-width: 52rem;
+  }
+  .panel--overlay .panel__cab {
+    display: none;
   }
 
   .panel__cuerpo {

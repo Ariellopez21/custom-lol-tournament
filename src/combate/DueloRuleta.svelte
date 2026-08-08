@@ -22,6 +22,7 @@
   import Ruleta from './Ruleta.svelte'
   import { estado } from '../core/estado.svelte.js'
   import { CHAMPION_IDS, getChampion } from '../core/champions.js'
+  import * as sonido from '../core/sonido.js'
 
   let {
     a,
@@ -85,6 +86,12 @@
   const quedanGames = $derived(gameN <= maxGames)
 
   // ── Giro ─────────────────────────────────────────────
+  // Duración del giro: debe coincidir con la de `Ruleta.svelte` para que el
+  // sonido (1.11) case con el frenado visual (reduced-motion ⇒ 900 ms).
+  const reduce =
+    typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches
+  const DUR_GIRO = reduce ? 900 : 5200
+
   let r1 = $state()
   let r2 = $state()
   let girando = $state(false)
@@ -109,6 +116,7 @@
     champA = null
     champB = null
     girando = true
+    sonido.giro(DUR_GIRO) // 1.11 — una sola pista de tics, aunque sean 2 tambores
     if (modo === 'single') {
       pendientes = 1
       r1?.girar()
@@ -129,7 +137,10 @@
     finPaso()
   }
   function finPaso() {
-    if (--pendientes <= 0) girando = false // el resultado espera a «Anotar»
+    if (--pendientes <= 0) {
+      girando = false // el resultado espera a «Anotar»
+      sonido.revelacion() // 1.11 — fanfarria al aterrizar el/los campeón(es)
+    }
   }
 
   // 1.8 — «Anotar»: fija el/los campeón(es) del game en la fila 2 y limpia la
@@ -141,6 +152,7 @@
     onsorteo({ a: champA, b: champB })
     champA = null
     champB = null
+    sonido.anotar() // 1.11 — blip positivo al fijar el campeón en la fila 2
   }
 
   const etiquetaGirar = $derived(
@@ -153,9 +165,9 @@
        la identidad de ambos (cara ruleta del torneo, mostrarCabecera=false). -->
   {#if mostrarCabecera}
     <div class="vs-cab">
-      {@render ficha(nombreA)}
+      {@render ficha(nombreA, partA?.avatar)}
       <span class="vs-cab__x">VS</span>
-      {@render ficha(nombreB)}
+      {@render ficha(nombreB, partB?.avatar)}
     </div>
   {/if}
 
@@ -205,9 +217,11 @@
   {/if}
 </div>
 
-{#snippet ficha(nombre)}
+{#snippet ficha(nombre, avatar)}
   <div class="ficha">
-    <span class="ficha__av">{inicial(nombre)}</span>
+    <span class="ficha__av">
+      {#if avatar}<img src={avatar} alt="" />{:else}{inicial(nombre)}{/if}
+    </span>
     <span class="ficha__nom">{nombre}</span>
   </div>
 {/snippet}
@@ -262,6 +276,7 @@
     height: 2.2rem;
     display: grid;
     place-items: center;
+    overflow: hidden;
     border-radius: 50%;
     border: 1px solid var(--borde-oro);
     background: radial-gradient(120% 120% at 50% 0%, rgba(200, 170, 110, 0.25), rgba(7, 11, 18, 0.6));
@@ -269,6 +284,12 @@
     font-family: var(--fuente-display);
     font-weight: 800;
     font-size: 1rem;
+  }
+  .ficha__av img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
   }
   .ficha__nom {
     font-family: var(--fuente-display);

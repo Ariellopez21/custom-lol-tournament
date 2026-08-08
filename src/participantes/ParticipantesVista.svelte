@@ -6,8 +6,10 @@
     crearParticipante,
     renombrarParticipante,
     borrarParticipante,
+    definirAvatar,
   } from '../core/estado.svelte.js'
   import { CHAMPIONS } from '../core/champions.js'
+  import { procesarAvatar } from '../core/avatar.js'
   import EditorPool from './EditorPool.svelte'
 
   const TOTAL = CHAMPIONS.length
@@ -18,7 +20,33 @@
   let confirmandoId = $state(null)
   let poolDe = $state(null) // participante cuyo pool se está editando
 
+  // Icono/avatar (subida local): un solo <input file> compartido; `objetivoId`
+  // recuerda a qué participante aplicarlo. La imagen se redimensiona en el navegador.
+  let fileInput = $state()
+  let objetivoId = $state(null)
+  let avisoError = $state('')
+
   const participantes = $derived(estado.participantes)
+
+  function pedirIcono(/** @type {string} */ id) {
+    objetivoId = id
+    avisoError = ''
+    fileInput?.click()
+  }
+  async function alElegirArchivo(/** @type {Event} */ e) {
+    const input = /** @type {HTMLInputElement} */ (e.currentTarget)
+    const archivo = input.files?.[0]
+    input.value = '' // permite reelegir el mismo archivo después
+    if (!archivo || !objetivoId) return
+    try {
+      const url = await procesarAvatar(archivo)
+      definirAvatar(objetivoId, url)
+    } catch (err) {
+      avisoError = err instanceof Error ? err.message : 'No se pudo cargar la imagen.'
+    } finally {
+      objetivoId = null
+    }
+  }
 
   function agregar() {
     if (crearParticipante(nombre)) nombre = ''
@@ -80,11 +108,38 @@
     <button class="boton" type="submit" disabled={!nombre.trim()}>Añadir</button>
   </form>
 
+  <!-- Input de icono compartido (oculto); lo dispara el 📷 de cada tarjeta. -->
+  <input
+    class="oculto"
+    type="file"
+    accept="image/png,image/jpeg,image/webp"
+    bind:this={fileInput}
+    onchange={alElegirArchivo}
+    aria-hidden="true"
+    tabindex="-1"
+  />
+  {#if avisoError}
+    <p class="aviso-error" role="alert">{avisoError}</p>
+  {/if}
+
   {#if participantes.length > 0}
     <ul class="lista">
       {#each participantes as p (p.id)}
         <li class="tarjeta">
-          <div class="tarjeta__avatar" aria-hidden="true">{inicial(p.nombre)}</div>
+          <button
+            class="tarjeta__avatar"
+            type="button"
+            onclick={() => pedirIcono(p.id)}
+            title={p.avatar ? 'Cambiar icono' : 'Añadir icono'}
+            aria-label={p.avatar ? `Cambiar icono de ${p.nombre}` : `Añadir icono a ${p.nombre}`}
+          >
+            {#if p.avatar}
+              <img src={p.avatar} alt="" />
+            {:else}
+              <span aria-hidden="true">{inicial(p.nombre)}</span>
+            {/if}
+            <span class="tarjeta__avatar-cam" aria-hidden="true">📷</span>
+          </button>
 
           <div class="tarjeta__cuerpo">
             {#if editandoId === p.id}
@@ -119,6 +174,9 @@
               <button class="mini mini--peligro" type="button" onclick={() => borrar(p.id)}>Sí</button>
               <button class="mini" type="button" onclick={() => (confirmandoId = null)}>No</button>
             {:else}
+              {#if p.avatar}
+                <button class="mini" type="button" onclick={() => definirAvatar(p.id, null)} title="Quitar icono" aria-label={`Quitar icono de ${p.nombre}`}>Quitar icono</button>
+              {/if}
               <button class="mini mini--pool" type="button" onclick={() => (poolDe = p)}>Pool</button>
               <button class="mini" type="button" onclick={() => iniciarEdicion(p)}>Editar</button>
               <button
@@ -263,11 +321,14 @@
     border-color: var(--borde-oro);
   }
   .tarjeta__avatar {
+    position: relative;
     flex-shrink: 0;
     width: 42px;
     height: 42px;
     display: grid;
     place-items: center;
+    padding: 0;
+    overflow: hidden;
     border-radius: 50%;
     border: 1px solid var(--borde-oro-fuerte);
     background: radial-gradient(circle at 50% 30%, rgba(200, 170, 110, 0.18), transparent 70%);
@@ -275,6 +336,60 @@
     font-weight: 800;
     font-size: 1.1rem;
     color: var(--oro);
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .tarjeta__avatar:hover {
+    border-color: var(--oro);
+    box-shadow: 0 0 0 2px rgba(200, 170, 110, 0.2);
+  }
+  .tarjeta__avatar:focus-visible {
+    outline: 2px solid var(--arcano);
+    outline-offset: 2px;
+  }
+  .tarjeta__avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .tarjeta__avatar-cam {
+    position: absolute;
+    right: -1px;
+    bottom: -1px;
+    font-size: 0.62rem;
+    line-height: 1;
+    padding: 1px 2px;
+    border-radius: 6px 0 0 0;
+    background: rgba(7, 11, 18, 0.75);
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .tarjeta__avatar:hover .tarjeta__avatar-cam,
+  .tarjeta__avatar:focus-visible .tarjeta__avatar-cam {
+    opacity: 1;
+  }
+
+  .oculto {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .aviso-error {
+    margin: -0.6rem 0 1.2rem;
+    padding: 0.5rem 0.7rem;
+    border: 1px solid rgba(192, 69, 92, 0.5);
+    border-radius: 3px;
+    background: rgba(192, 69, 92, 0.08);
+    color: var(--sangre);
+    font-size: 0.82rem;
+    text-align: center;
   }
   .tarjeta__cuerpo {
     flex: 1;

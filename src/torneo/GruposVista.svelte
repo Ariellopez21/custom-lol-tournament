@@ -127,7 +127,10 @@
   }
   function registrar() {
     if (!combate || (ga === 0 && gb === 0)) return
-    registrarResultado(torneo.id, etapa.id, combate.a, combate.b, { a: ga, b: gb }, combate.grupoId)
+    registrarResultado(torneo.id, etapa.id, combate.a, combate.b, { a: ga, b: gb }, combate.grupoId, {
+      a: $state.snapshot(jugadosA),
+      b: $state.snapshot(jugadosB),
+    })
     cancelar()
   }
   function deshacer(/** @type {any} */ grupo) {
@@ -262,6 +265,8 @@
                   {maxLados}
                   permitirAnadir
                   compacto
+                  exportable
+                  titulo={grupo.nombre ?? etapa?.nombre ?? 'Fase de grupos'}
                   hint="games · campeones jugados (fila 2) · máx {maxLados} · empate permitido"
                 />
                 <div class="grupo__acc">
@@ -309,6 +314,8 @@
           bind:jugadosA
           bind:jugadosB
           {maxLados}
+          exportable
+          titulo={grupoActivo.nombre ?? etapa?.nombre ?? 'Fase de grupos'}
           hint="marcador final · máx {maxLados} · empate permitido · la fila 2 la anota la ruleta"
         />
         <DueloRuleta

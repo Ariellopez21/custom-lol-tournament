@@ -30,7 +30,7 @@ export function estadoInicial() {
     torneos: [], // Torneo[]
     temporadas: [], // Temporada[]
     ajustes: {
-      sonido: true, // combate con audio (fase 1.12)
+      sonido: true, // combate con audio sintetizado (fase 1.11)
     },
   }
 }

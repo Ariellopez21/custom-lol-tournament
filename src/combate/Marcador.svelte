@@ -12,6 +12,7 @@
   import { estado } from '../core/estado.svelte.js'
   import { getChampion } from '../core/champions.js'
   import SelectorCampeon from './SelectorCampeon.svelte'
+  import { descargarTarjeta } from './tarjeta.js'
 
   let {
     a,
@@ -25,6 +26,8 @@
     permitirAnadir = false,
     compacto = false,
     hint = '',
+    exportable = false,
+    titulo = '',
   } = $props()
 
   const partA = $derived(estado.participantes.find((p) => p.id === a))
@@ -48,6 +51,26 @@
     if (lado === 'a') jugadosA = jugadosA.filter((_, k) => k !== i)
     else jugadosB = jugadosB.filter((_, k) => k !== i)
   }
+
+  // 1.13 — Exporta la tarjeta de resultado (PNG) desde el estado en vivo.
+  let generando = $state(false)
+  async function exportar() {
+    if (generando) return
+    generando = true
+    try {
+      await descargarTarjeta({
+        a,
+        b,
+        ga,
+        gb,
+        jugadosA: $state.snapshot(jugadosA),
+        jugadosB: $state.snapshot(jugadosB),
+        titulo,
+      })
+    } finally {
+      generando = false
+    }
+  }
 </script>
 
 <div class="mc" class:mc--compacto={compacto}>
@@ -63,6 +86,11 @@
     {@render tira('b', jugadosB)}
   </div>
   {#if hint}<p class="hint">{hint}</p>{/if}
+  {#if exportable}
+    <button class="tarjeta" type="button" onclick={exportar} disabled={generando}>
+      {generando ? '⏳ Generando…' : '📸 Tarjeta de resultado'}
+    </button>
+  {/if}
 </div>
 
 {#if picker}
@@ -75,8 +103,11 @@
 {/if}
 
 {#snippet lado(nombre, cual, valor, set)}
+  {@const av = cual === 'a' ? partA?.avatar : partB?.avatar}
   <div class="ficha ficha--{cual}">
-    <span class="ficha__av">{inicial(nombre)}</span>
+    <span class="ficha__av">
+      {#if av}<img src={av} alt="" />{:else}{inicial(nombre)}{/if}
+    </span>
     <div class="ficha__cuerpo">
       <span class="ficha__nom">{nombre}</span>
       <div class="score">
@@ -169,6 +200,7 @@
     height: var(--av);
     display: grid;
     place-items: center;
+    overflow: hidden;
     border-radius: 50%;
     border: 1px solid var(--borde-oro);
     background: radial-gradient(120% 120% at 50% 0%, rgba(200, 170, 110, 0.25), rgba(7, 11, 18, 0.6));
@@ -176,6 +208,12 @@
     font-family: var(--fuente-display);
     font-weight: 800;
     font-size: calc(var(--av) * 0.45);
+  }
+  .ficha__av img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
   }
   .ficha__cuerpo {
     display: flex;
@@ -318,6 +356,28 @@
     letter-spacing: 0.1em;
     text-transform: uppercase;
     color: var(--humo);
+  }
+
+  .tarjeta {
+    align-self: center;
+    background: transparent;
+    border: 1px solid var(--borde-oro);
+    border-radius: 2px;
+    color: var(--humo);
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0.4rem 0.8rem;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .tarjeta:hover:not(:disabled) {
+    color: var(--oro-claro);
+    border-color: var(--borde-oro-fuerte);
+  }
+  .tarjeta:disabled {
+    opacity: 0.6;
+    cursor: progress;
   }
 
   @media (prefers-reduced-motion: reduce) {

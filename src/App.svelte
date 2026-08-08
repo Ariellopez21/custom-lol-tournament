@@ -1,6 +1,9 @@
 <script>
   import { ruta } from './ui/ruta.svelte.js'
   import { CHAMPIONS } from './core/champions.js'
+  import { estado, alternarSonido } from './core/estado.svelte.js'
+  import { overlay } from './ui/overlay.svelte.js'
+  import OverlayControl from './combate/OverlayControl.svelte'
 
   import CombateVista from './combate/CombateVista.svelte'
   import ParticipantesVista from './participantes/ParticipantesVista.svelte'
@@ -18,27 +21,51 @@
   // Sección activa según el hash; si es desconocido, cae en Combate.
   const seccion = $derived(SECCIONES.find((s) => s.id === ruta.seccion) ?? SECCIONES[0])
   const Vista = $derived(seccion.Vista)
+
+  // Toggle de sonido del combate (1.11); por defecto activado.
+  const sonidoOn = $derived(estado.ajustes?.sonido !== false)
+
+  // Modo Overlay/OBS (1.12): marca <html> con el fondo elegido y oculta el cromo.
+  // El body toma su color de fondo desde app.css según `data-overlay`.
+  $effect(() => {
+    const el = document.documentElement
+    if (overlay.activo) el.dataset.overlay = overlay.fondo
+    else delete el.dataset.overlay
+  })
 </script>
 
-<div class="app">
+<div class="app" class:app--overlay={overlay.activo}>
   <header class="barra">
     <a class="marca" href="#/combate" aria-label="Inicio · Combate">
       <span class="marca__eyebrow">Custom</span>
       <span class="marca__nombre">LoL Tournament</span>
     </a>
 
-    <nav class="nav" aria-label="Secciones">
-      {#each SECCIONES as s (s.id)}
-        <a
-          class="nav__enlace"
-          class:activo={s.id === seccion.id}
-          href={`#/${s.id}`}
-          aria-current={s.id === seccion.id ? 'page' : undefined}
-        >
-          {s.etiqueta}
-        </a>
-      {/each}
-    </nav>
+    <div class="barra__der">
+      <nav class="nav" aria-label="Secciones">
+        {#each SECCIONES as s (s.id)}
+          <a
+            class="nav__enlace"
+            class:activo={s.id === seccion.id}
+            href={`#/${s.id}`}
+            aria-current={s.id === seccion.id ? 'page' : undefined}
+          >
+            {s.etiqueta}
+          </a>
+        {/each}
+      </nav>
+
+      <button
+        class="sonido"
+        type="button"
+        onclick={alternarSonido}
+        aria-pressed={sonidoOn}
+        title={sonidoOn ? 'Silenciar el combate' : 'Activar el sonido del combate'}
+        aria-label={sonidoOn ? 'Silenciar el combate' : 'Activar el sonido del combate'}
+      >
+        {sonidoOn ? '🔊' : '🔇'}
+      </button>
+    </div>
   </header>
 
   <main class="contenido">
@@ -50,11 +77,24 @@
   </footer>
 </div>
 
+{#if overlay.activo}
+  <OverlayControl />
+{/if}
+
 <style>
   .app {
     min-height: 100vh;
     display: flex;
     flex-direction: column;
+  }
+
+  /* Modo Overlay/OBS (1.12): se oculta todo el cromo de la app; el combate por
+     ruleta vive en el ModalCombate, que se reubica en <body> (use:portal), así
+     que NO cuelga de .contenido y sigue visible sobre el fondo transparente. */
+  .app--overlay .barra,
+  .app--overlay .contenido,
+  .app--overlay .pie {
+    display: none;
   }
 
   /* ── Barra superior ─────────────────────────────── */
@@ -96,11 +136,41 @@
     color: var(--oro-claro);
   }
 
-  /* ── Navegación ─────────────────────────────────── */
+  /* ── Navegación + ajustes ───────────────────────── */
+  .barra__der {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+  }
   .nav {
     display: flex;
     flex-wrap: wrap;
     gap: 0.3rem;
+  }
+  .sonido {
+    flex: none;
+    width: 36px;
+    height: 36px;
+    display: grid;
+    place-items: center;
+    background: transparent;
+    border: 1px solid var(--borde-oro-tenue);
+    border-radius: 2px;
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .sonido:hover {
+    border-color: var(--borde-oro);
+  }
+  .sonido[aria-pressed='false'] {
+    opacity: 0.6;
+  }
+  .sonido:focus-visible {
+    outline: 2px solid var(--arcano);
+    outline-offset: 2px;
   }
   .nav__enlace {
     padding: 0.5rem 0.85rem;

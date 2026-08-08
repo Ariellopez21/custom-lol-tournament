@@ -42,6 +42,23 @@ function nuevoId(prefijo = 'id') {
     : `${prefijo}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
 }
 
+/**
+ * 1.10 — Construye el `games[]` del duelo a partir de los campeones jugados por
+ * cada lado (fila 2 del marcador). `campeones = { a:[ids], b:[ids] }`; cada índice
+ * es un game. En mirror, a y b traen el mismo id por game. Vacío ⇒ [].
+ * @param {{ a?:string[], b?:string[] } | null} [campeones]
+ */
+function construirGames(campeones) {
+  const a = campeones?.a ?? []
+  const b = campeones?.b ?? []
+  const n = Math.max(a.length, b.length)
+  const games = []
+  for (let i = 0; i < n; i++) {
+    games.push({ n: i + 1, campeones: { a: a[i] ?? null, b: b[i] ?? null } })
+  }
+  return games
+}
+
 /* ── Participantes (Fase 2) ──────────────────────────────────── */
 
 /**
@@ -75,6 +92,19 @@ export function renombrarParticipante(id, nombre) {
     participante.nombre = limpio
     persistir()
   }
+}
+
+/**
+ * Define el icono/avatar de un participante (data URL de core/avatar.js), o lo
+ * quita con `null`. Ver [[avatar-invocadores]].
+ * @param {string} id
+ * @param {string|null} dataUrl
+ */
+export function definirAvatar(id, dataUrl) {
+  const participante = estado.participantes.find((p) => p.id === id)
+  if (!participante) return
+  participante.avatar = dataUrl || null
+  persistir()
 }
 
 /** Borra un participante por id. */
@@ -198,8 +228,9 @@ export function borrarTorneo(id) {
  * @param {string} bId
  * @param {{a:number, b:number}} marcador  games ganados por cada lado
  * @param {string|null} [grupoId]  si la etapa es de grupos, el grupo del combate
+ * @param {{ a?:string[], b?:string[] } | null} [campeones]  campeones jugados (1.10)
  */
-export function registrarResultado(torneoId, etapaId, aId, bId, marcador, grupoId = null) {
+export function registrarResultado(torneoId, etapaId, aId, bId, marcador, grupoId = null, campeones = null) {
   const torneo = estado.torneos.find((t) => t.id === torneoId)
   if (!torneo) return null
   const etapa = torneo.etapas.find((e) => e.id === etapaId)
@@ -218,7 +249,7 @@ export function registrarResultado(torneoId, etapaId, aId, bId, marcador, grupoI
     participantes: [aId, bId],
     reglas: $state.snapshot(torneo.reglas), // heredadas (copia plana)
     marcador: { a: ga, b: gb },
-    games: [], // se llenan si resolucion="ruleta" (Fase 1)
+    games: construirGames(campeones), // 1.10 — campeones jugados por game
     ganador,
     estado: 'terminado',
     jugadoEn: ahora,
@@ -291,8 +322,9 @@ export function limpiarBracket(torneoId, etapaId) {
  * @param {string} etapaId
  * @param {string} llaveId
  * @param {{a:number, b:number}} marcador
+ * @param {{ a?:string[], b?:string[] } | null} [campeones]  campeones jugados (1.10)
  */
-export function resolverLlave(torneoId, etapaId, llaveId, marcador) {
+export function resolverLlave(torneoId, etapaId, llaveId, marcador, campeones = null) {
   const torneo = estado.torneos.find((t) => t.id === torneoId)
   if (!torneo) return null
   const etapa = torneo.etapas.find((e) => e.id === etapaId)
@@ -315,7 +347,7 @@ export function resolverLlave(torneoId, etapaId, llaveId, marcador) {
     participantes: [llave.a, llave.b],
     reglas: $state.snapshot(torneo.reglas),
     marcador: { a: ga, b: gb },
-    games: [],
+    games: construirGames(campeones), // 1.10
     ganador,
     estado: 'terminado',
     jugadoEn: ahora,
@@ -508,4 +540,99 @@ export function reabrirTorneo(id) {
   if (ultima) ultima.estado = 'en_curso'
   torneo.actualizadoEn = new Date().toISOString()
   persistir()
+}
+
+/* ── Temporadas (Fase 4.1) ───────────────────────────────────── */
+
+/**
+ * Crea una temporada (agrupa torneos). Devuelve la temporada o null si el nombre
+ * queda vacío. Modelo: `{ id, nombre, torneos:[ids], inicio, fin }`.
+ * @param {string} nombre
+ */
+export function crearTemporada(nombre) {
+  const limpio = (nombre ?? '').trim()
+  if (!limpio) return null
+  const temporada = {
+    id: nuevoId('temp'),
+    nombre: limpio,
+    torneos: /** @type {string[]} */ ([]),
+    inicio: new Date().toISOString(),
+    fin: /** @type {string|null} */ (null),
+  }
+  estado.temporadas.push(temporada)
+  persistir()
+  return temporada
+}
+
+/** Renombra una temporada. Ignora nombres vacíos. */
+export function renombrarTemporada(id, nombre) {
+  const limpio = (nombre ?? '').trim()
+  if (!limpio) return
+  const t = estado.temporadas.find((s) => s.id === id)
+  if (t) {
+    t.nombre = limpio
+    persistir()
+  }
+}
+
+/** Borra una temporada (NO borra sus torneos; solo los desvincula). */
+export function borrarTemporada(id) {
+  const i = estado.temporadas.findIndex((s) => s.id === id)
+  if (i === -1) return
+  estado.temporadas.splice(i, 1)
+  estado.torneos.forEach((t) => {
+    if (t.temporadaId === id) t.temporadaId = null
+  })
+  persistir()
+}
+
+/**
+ * Asigna (o desasigna, con `temporadaId = null`) un torneo a una temporada.
+ * Mantiene en sync `torneo.temporadaId` y `temporada.torneos[]`.
+ * @param {string} torneoId
+ * @param {string|null} temporadaId
+ */
+export function asignarTorneoATemporada(torneoId, temporadaId) {
+  const torneo = estado.torneos.find((t) => t.id === torneoId)
+  if (!torneo) return
+  // Quitar de la temporada anterior.
+  if (torneo.temporadaId) {
+    const prev = estado.temporadas.find((s) => s.id === torneo.temporadaId)
+    if (prev) prev.torneos = prev.torneos.filter((id) => id !== torneoId)
+  }
+  torneo.temporadaId = temporadaId ?? null
+  // Añadir a la nueva.
+  if (temporadaId) {
+    const nueva = estado.temporadas.find((s) => s.id === temporadaId)
+    if (nueva && !nueva.torneos.includes(torneoId)) nueva.torneos.push(torneoId)
+  }
+  persistir()
+}
+
+/** Cierra una temporada (fija `fin`). */
+export function cerrarTemporada(id) {
+  const t = estado.temporadas.find((s) => s.id === id)
+  if (t) {
+    t.fin = new Date().toISOString()
+    persistir()
+  }
+}
+
+/** Reabre una temporada cerrada (limpia `fin`). */
+export function reabrirTemporada(id) {
+  const t = estado.temporadas.find((s) => s.id === id)
+  if (t) {
+    t.fin = null
+    persistir()
+  }
+}
+
+/* ── Ajustes (Fase 1.11) ─────────────────────────────────────── */
+
+/** Alterna el sonido del combate (1.11) y persiste. Devuelve el nuevo valor. */
+export function alternarSonido() {
+  if (!estado.ajustes) estado.ajustes = { sonido: true }
+  estado.ajustes.sonido = estado.ajustes.sonido === false
+  persistir()
+  return estado.ajustes.sonido
 }

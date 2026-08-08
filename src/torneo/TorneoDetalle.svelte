@@ -10,8 +10,15 @@
   import TablaVista from './TablaVista.svelte'
   import GruposVista from './GruposVista.svelte'
   import BracketVista from './BracketVista.svelte'
+  import HistorialDuelos from './HistorialDuelos.svelte'
+  import EstadisticasPanel from '../estadisticas/EstadisticasPanel.svelte'
 
   let { torneo } = $props()
+
+  // Historial (4.2): todos los duelos terminados del torneo (todas las etapas).
+  const duelosTorneo = $derived(
+    estado.duelos.filter((d) => d.torneoId === torneo.id && d.estado === 'terminado')
+  )
 
   const POTENCIAS = [4, 8, 16, 32, 64]
 
@@ -129,6 +136,15 @@
       {/if}
     </div>
   {/if}
+
+  {#if duelosTorneo.length > 0}
+    <div class="historial-wrap">
+      <EstadisticasPanel duelos={duelosTorneo} titulo="Estadísticas del torneo" />
+    </div>
+    <div class="historial-wrap">
+      <HistorialDuelos duelos={duelosTorneo} />
+    </div>
+  {/if}
 </section>
 
 <style>
@@ -244,6 +260,10 @@
     padding: 2rem;
     border: 1px dashed var(--borde-oro);
     border-radius: 4px;
+  }
+
+  .historial-wrap {
+    margin-top: 1.8rem;
   }
 
   /* ── Abrir siguiente etapa ───────────────────────── */
